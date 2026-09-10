@@ -1,0 +1,844 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CaruFlex Produção</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap">
+<style>
+:root{
+  --bg:#F4F6F4;
+  --surface:#FFFFFF;
+  --surface-2:#EAEEEA;
+  --border:#D9DFDA;
+  --text:#161F27;
+  --text-muted:#5B6873;
+  --accent:#1C5D7A;
+  --accent-strong:#123F52;
+  --accent-soft:#E4EEF2;
+  --success:#2E7D5B;
+  --success-soft:#E4F3EC;
+  --warning:#B5790A;
+  --warning-soft:#FBF0DC;
+  --danger:#B23A34;
+  --danger-soft:#FBE7E5;
+  --shadow: 0 1px 2px rgba(20,30,38,.06), 0 4px 16px rgba(20,30,38,.05);
+  --radius: 14px;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#111820; --surface:#1A232C; --surface-2:#212C35; --border:#333F4A; --text:#E8EEF2; --text-muted:#9AAAB6;
+    --accent:#5FB2D6; --accent-strong:#8CCBE5; --accent-soft:#1E3540; --success:#4FBE8A; --success-soft:#173028;
+    --warning:#E3AC48; --warning-soft:#332711; --danger:#E2726C; --danger-soft:#3A1E1C;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 6px 20px rgba(0,0,0,.35); color-scheme: dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#111820; --surface:#1A232C; --surface-2:#212C35; --border:#333F4A; --text:#E8EEF2; --text-muted:#9AAAB6;
+  --accent:#5FB2D6; --accent-strong:#8CCBE5; --accent-soft:#1E3540; --success:#4FBE8A; --success-soft:#173028;
+  --warning:#E3AC48; --warning-soft:#332711; --danger:#E2726C; --danger-soft:#3A1E1C;
+  --shadow: 0 1px 2px rgba(0,0,0,.3), 0 6px 20px rgba(0,0,0,.35); color-scheme: dark;
+}
+*{box-sizing:border-box;}
+html,body{background:var(--bg);}
+body{
+  margin:0; color:var(--text);
+  font-family:"Inter",system-ui,-apple-system,sans-serif;
+  font-size:15px; line-height:1.5;
+  padding-bottom:env(safe-area-inset-bottom);
+}
+h1,h2,h3{font-family:"Sora",system-ui,sans-serif; text-wrap:balance; margin:0;}
+button{font-family:inherit;}
+::selection{background:var(--accent-soft);}
+input,select,textarea{
+  font-family:inherit; font-size:15px; color:var(--text); background:var(--surface);
+  border:1px solid var(--border); border-radius:9px; padding:9px 11px; width:100%;
+}
+input:focus,select:focus,textarea:focus,button:focus-visible{ outline:2px solid var(--accent); outline-offset:1px; }
+label{display:block; font-size:12.5px; font-weight:600; color:var(--text-muted); margin:0 0 5px; letter-spacing:.02em;}
+.field{margin-bottom:14px;}
+.row{display:flex; gap:12px; flex-wrap:wrap;}
+.row > .field{flex:1 1 160px;}
+button.btn{ border:none; border-radius:10px; padding:10px 16px; font-weight:600; font-size:14.5px; cursor:pointer; display:inline-flex; align-items:center; gap:6px; white-space:nowrap; }
+.btn-primary{background:var(--accent); color:#fff;}
+.btn-primary:hover{background:var(--accent-strong);}
+.btn-ghost{background:transparent; color:var(--accent); border:1px solid var(--border);}
+.btn-ghost:hover{background:var(--surface-2);}
+.btn-danger{background:var(--danger-soft); color:var(--danger);}
+.btn-success{background:var(--success); color:#fff;}
+.btn-block{width:100%; justify-content:center;}
+.btn-sm{padding:7px 12px; font-size:13.5px; border-radius:8px;}
+a{color:var(--accent);}
+#app{min-height:100vh; display:flex; flex-direction:column;}
+.topbar{ position:sticky; top:0; z-index:20; background:var(--surface); border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; padding:10px 18px; gap:12px; }
+.brand{display:flex; align-items:center; gap:9px;}
+.brand-mark{ width:34px; height:34px; border-radius:9px; background:var(--accent); color:#fff; display:flex; align-items:center; justify-content:center; font-family:"Sora"; font-weight:800; font-size:15px; flex-shrink:0; }
+.brand-text{font-family:"Sora"; font-weight:700; font-size:16.5px; letter-spacing:-.01em;}
+.brand-sub{font-size:11.5px; color:var(--text-muted); margin-top:-2px;}
+.user-chip{display:flex; align-items:center; gap:10px; font-size:13.5px;}
+.user-chip .who{text-align:right; line-height:1.25;}
+.user-chip .name{font-weight:600;}
+.user-chip .setor{color:var(--text-muted); font-size:11.5px; text-transform:uppercase; letter-spacing:.05em;}
+.avatar{ width:32px; height:32px; border-radius:50%; background:var(--accent-soft); color:var(--accent-strong); display:flex; align-items:center; justify-content:center; font-weight:700; font-size:13px; flex-shrink:0; }
+nav.tabs{ display:flex; gap:4px; padding:8px 14px; background:var(--surface); border-bottom:1px solid var(--border); overflow-x:auto; -webkit-overflow-scrolling:touch; }
+nav.tabs .tab{ border:none; background:transparent; color:var(--text-muted); padding:9px 14px; border-radius:9px; font-weight:600; font-size:13.5px; cursor:pointer; white-space:nowrap; display:flex; align-items:center; gap:6px; }
+nav.tabs .tab.active{background:var(--accent-soft); color:var(--accent-strong);}
+nav.tabs .tab .count{ background:var(--danger); color:#fff; font-size:10.5px; font-weight:700; border-radius:99px; padding:1px 6px; min-width:16px; text-align:center; }
+main{flex:1; padding:18px; max-width:1000px; width:100%; margin:0 auto;}
+.card{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); box-shadow:var(--shadow); padding:18px;}
+.section-title{font-size:18px; font-weight:700; margin-bottom:4px;}
+.section-sub{color:var(--text-muted); font-size:13.5px; margin-bottom:16px;}
+.stack{display:flex; flex-direction:column; gap:14px;}
+.chip{display:inline-flex; align-items:center; gap:5px; font-size:11.5px; font-weight:700; padding:4px 10px; border-radius:99px; text-transform:uppercase; letter-spacing:.03em;}
+.chip-enviado{background:var(--accent-soft); color:var(--accent-strong);}
+.chip-recebido{background:var(--warning-soft); color:var(--warning);}
+.chip-concluido{background:var(--success-soft); color:var(--success);}
+.chip-baixo{background:var(--danger-soft); color:var(--danger);}
+.chip-ok{background:var(--success-soft); color:var(--success);}
+.order-card{border:1px solid var(--border); border-radius:12px; padding:14px 16px; background:var(--surface); position:relative; overflow:hidden;}
+.order-card::before{content:""; position:absolute; left:0; top:0; bottom:0; width:4px;}
+.order-card.st-enviado::before{background:var(--accent);}
+.order-card.st-recebido::before{background:var(--warning);}
+.order-card.st-concluido::before{background:var(--success);}
+.order-head{display:flex; justify-content:space-between; align-items:flex-start; gap:10px; margin-bottom:8px;}
+.order-num{font-weight:700; font-size:15px;}
+.order-meta{color:var(--text-muted); font-size:12.5px; margin-top:2px;}
+.order-items{font-size:13.5px; color:var(--text); margin:8px 0; display:flex; flex-direction:column; gap:3px;}
+.order-items .it{display:flex; justify-content:space-between; gap:8px; border-bottom:1px dashed var(--border); padding:4px 0;}
+.order-items .it:last-child{border-bottom:none;}
+.qty{font-variant-numeric:tabular-nums; font-weight:600;}
+.order-foot{display:flex; justify-content:space-between; align-items:center; gap:10px; margin-top:10px; flex-wrap:wrap;}
+.timeline{font-size:12px; color:var(--text-muted); display:flex; flex-wrap:wrap; gap:10px;}
+.stock-table{width:100%; border-collapse:collapse; font-size:13.5px;}
+.stock-table th{text-align:left; color:var(--text-muted); font-weight:600; font-size:11.5px; text-transform:uppercase; letter-spacing:.04em; padding:8px 10px; border-bottom:1px solid var(--border);}
+.stock-table td{padding:9px 10px; border-bottom:1px solid var(--border); vertical-align:middle;}
+.stock-table tr:last-child td{border-bottom:none;}
+.stock-cat{font-weight:700; font-size:13px; background:var(--surface-2); padding:8px 10px; border-radius:8px; margin:16px 0 6px;}
+.qty-cell{font-variant-numeric:tabular-nums; font-weight:700; white-space:nowrap;}
+.item-row{border:1px solid var(--border); border-radius:10px; padding:12px; background:var(--surface-2);}
+.item-row-head{display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;}
+.item-row-head .idx{font-weight:700; font-size:13px; color:var(--text-muted);}
+.login-wrap{min-height:100vh; display:flex; align-items:center; justify-content:center; padding:24px;}
+.login-card{max-width:380px; width:100%;}
+.login-logo{display:flex; flex-direction:column; align-items:center; gap:10px; margin-bottom:22px; text-align:center;}
+.login-logo .brand-mark{width:52px; height:52px; font-size:22px; border-radius:14px;}
+.login-logo h1{font-size:22px;}
+.login-logo p{color:var(--text-muted); font-size:13.5px; margin-top:2px;}
+.error-msg{background:var(--danger-soft); color:var(--danger); font-size:13.5px; padding:10px 12px; border-radius:9px; margin-bottom:12px;}
+.info-banner{background:var(--accent-soft); color:var(--accent-strong); font-size:13px; padding:10px 12px; border-radius:9px; margin-bottom:14px;}
+.warn-banner{background:var(--warning-soft); color:var(--warning); font-size:13px; padding:10px 12px; border-radius:9px; margin-bottom:14px;}
+.empty-state{text-align:center; padding:40px 20px; color:var(--text-muted);}
+.empty-state .glyph{font-size:32px; margin-bottom:8px;}
+.filter-row{display:flex; gap:6px; flex-wrap:wrap; margin-bottom:14px;}
+.filter-row button{ border:1px solid var(--border); background:var(--surface); color:var(--text-muted); padding:7px 13px; border-radius:99px; font-size:12.5px; font-weight:600; cursor:pointer; }
+.filter-row button.active{background:var(--accent); color:#fff; border-color:var(--accent);}
+.hint{font-size:12px; color:var(--text-muted); margin-top:4px;}
+.divider{height:1px; background:var(--border); margin:16px 0; border:none;}
+.badge-role{font-size:10.5px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; padding:2px 8px; border-radius:99px; background:var(--surface-2); color:var(--text-muted);}
+.file-input-wrap{border:1.5px dashed var(--border); border-radius:10px; padding:14px; text-align:center; font-size:13px; color:var(--text-muted); background:var(--surface);}
+.toast{ position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:var(--text); color:var(--bg); padding:11px 18px; border-radius:10px; font-size:13.5px; font-weight:600; box-shadow:var(--shadow); z-index:100; opacity:0; pointer-events:none; transition:opacity .25s, transform .25s; max-width:90vw; text-align:center; }
+.toast.show{opacity:1; transform:translateX(-50%) translateY(-4px);}
+.spinner{width:16px; height:16px; border:2px solid rgba(255,255,255,.4); border-top-color:#fff; border-radius:50%; animation:spin .7s linear infinite; display:inline-block;}
+@keyframes spin{to{transform:rotate(360deg);}}
+@media (prefers-reduced-motion: reduce){ .spinner{animation:none;} }
+@media (max-width:680px){
+  main{padding:12px 12px 90px;}
+  nav.tabs{ position:fixed; bottom:0; left:0; right:0; z-index:30; justify-content:space-around; padding:6px 4px calc(6px + env(safe-area-inset-bottom)); border-top:1px solid var(--border); border-bottom:none; box-shadow:0 -2px 12px rgba(0,0,0,.06); }
+  nav.tabs .tab{flex-direction:column; gap:2px; padding:6px 8px; font-size:11px; flex:1;}
+  .user-chip .who{display:none;}
+}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div class="toast" id="toast"></div>
+
+<script type="module">
+import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js";
+import {
+  getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut, createUserWithEmailAndPassword
+} from "https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js";
+import {
+  getFirestore, doc, getDoc, setDoc, updateDoc, collection, query, orderBy, limit, onSnapshot
+} from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
+
+/* =====================================================================
+   CONFIGURAÇÃO DO FIREBASE — troque pelos dados do SEU projeto gratuito
+   (Firebase Console > Configurações do projeto > Seus apps > Config).
+   Sem isso preenchido corretamente o sistema não funciona.
+   ===================================================================== */
+const firebaseConfig = {
+  apiKey: "AIzaSyBYE-xrd-vw7clZXGLq2wawe1yAN6LFIWY",
+  authDomain: "caruflex-producao.firebaseapp.com",
+  projectId: "caruflex-producao",
+  storageBucket: "caruflex-producao.firebasestorage.app",
+  messagingSenderId: "915222490386",
+  appId: "1:915222490386:web:198b133b01748b481117cb",
+  measurementId: "G-PP2X6LV3W2"
+};
+const CONFIG_PENDENTE = firebaseConfig.apiKey.indexOf("COLE_AQUI") === 0;
+
+const app = CONFIG_PENDENTE ? null : initializeApp(firebaseConfig);
+const auth = CONFIG_PENDENTE ? null : getAuth(app);
+const db = CONFIG_PENDENTE ? null : getFirestore(app);
+
+var state = {
+  authUser: null, user: null,
+  view: "login",
+  filtroPedidos: "todos",
+  bootstrapNecessario: null,
+  cache: { estoque: [], pedidos: [], usuarios: [] },
+  arteCache: {},
+  loading: true,
+  loginError: "", bootstrapError: ""
+};
+
+function $(sel, root){ return (root||document).querySelector(sel); }
+function el(tag, attrs, html){
+  var e = document.createElement(tag);
+  if(attrs) for(var k in attrs) e.setAttribute(k, attrs[k]);
+  if(html!=null) e.innerHTML = html;
+  return e;
+}
+function esc(s){
+  return (s==null?"":String(s)).replace(/[&<>"']/g, function(c){
+    return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];
+  });
+}
+function toast(msg){
+  var t = $("#toast"); t.textContent = msg; t.classList.add("show");
+  clearTimeout(toast._t); toast._t = setTimeout(function(){ t.classList.remove("show"); }, 2600);
+}
+function slugify(str){
+  return (str||"").toString().normalize("NFD").replace(/[̀-ͯ]/g,"")
+    .toLowerCase().trim().replace(/[^a-z0-9]+/g,"-").replace(/^-+|-+$/g,"").slice(0,120) || "x";
+}
+function estoqueId(categoria,cor,tamanho){
+  return slugify(categoria)+"__"+slugify(cor||"na")+"__"+slugify(tamanho||"na");
+}
+function loginParaEmail(login){
+  var limpo = (login||"").toString().trim().toLowerCase().replace(/[^a-z0-9._-]/g,"");
+  return limpo + "@caruflex.local";
+}
+function fmtNum(n){ n = Number(n)||0; return n.toLocaleString("pt-BR", {maximumFractionDigits:3}); }
+function fmtDate(iso){
+  if(!iso) return "—";
+  try{ var d = new Date(iso); return d.toLocaleDateString("pt-BR")+" "+d.toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"}); }
+  catch(e){ return iso; }
+}
+function todayInput(){ return new Date().toISOString().slice(0,10); }
+function orderNumero(){
+  var d = new Date();
+  var ymd = d.getFullYear().toString().slice(2)+String(d.getMonth()+1).padStart(2,"0")+String(d.getDate()).padStart(2,"0");
+  var rnd = Math.floor(1000+Math.random()*9000);
+  return "OP-"+ymd+"-"+rnd;
+}
+var CATEGORIAS_PADRAO = [
+  "Sacola Boca de Palhaço (Quilo)","Sacola Boca de Palhaço (Milheiro)","Sacola Camiseta",
+  "Sacola Alça Fita","Saco Kraft para Delivery","Sacola Kraft Alça Torcida","Saco de Envio",
+  "Sacola Boca de Palhaço Metalizada","Sacola Boca de Palhaço Bebidas","Sacolão","Sacola TNT","Diversos"
+];
+var TAMANHO_MAX_ARTE = 650*1024; // 650KB — margem segura para o limite de 1MiB por documento no Firestore
+
+// ---------- boot ----------
+var unsubList = [];
+function boot(){
+  render();
+  if(CONFIG_PENDENTE){ state.loading = false; render(); return; }
+  getDoc(doc(db,"meta","bootstrap")).then(function(snap){
+    state.bootstrapNecessario = !snap.exists();
+    state.loading = false;
+    render();
+    onAuthStateChanged(auth, function(u){
+      state.authUser = u;
+      if(u){
+        getDoc(doc(db,"perfis",u.uid)).then(function(psnap){
+          if(psnap.exists()){
+            var d = psnap.data();
+            state.user = {uid:u.uid, login:d.login, nome:d.nome, setor:d.setor};
+            state.view = defaultViewFor(d.setor);
+            subscribeAll();
+          } else {
+            state.user = null;
+            signOut(auth);
+            state.loginError = "Esta conta não tem um perfil configurado. Fale com o administrador.";
+          }
+          render();
+        });
+      } else {
+        state.user = null;
+        unsubList.forEach(function(u){u();}); unsubList = [];
+        render();
+      }
+    });
+  }).catch(function(){ state.loading = false; state.bootstrapNecessario = false; render(); });
+}
+function defaultViewFor(setor){
+  if(setor==="producao") return "recebimento";
+  if(setor==="admin") return "pedidos";
+  return "novoPedido";
+}
+function subscribeAll(){
+  unsubList.push(onSnapshot(collection(db,"estoque"), function(qs){
+    var arr = [];
+    qs.forEach(function(d){ arr.push(Object.assign({id:d.id}, d.data())); });
+    arr.sort(function(a,b){ return (a.categoria||"").localeCompare(b.categoria||"") || (a.cor||"").localeCompare(b.cor||""); });
+    state.cache.estoque = arr; render();
+  }));
+  unsubList.push(onSnapshot(query(collection(db,"pedidos"), orderBy("criadoEm","desc"), limit(300)), function(qs){
+    var arr = [];
+    qs.forEach(function(d){ arr.push(Object.assign({id:d.id}, d.data())); });
+    state.cache.pedidos = arr; render();
+  }));
+  unsubList.push(onSnapshot(collection(db,"perfis"), function(qs){
+    var arr = [];
+    qs.forEach(function(d){ arr.push(Object.assign({uid:d.id}, d.data())); });
+    state.cache.usuarios = arr; render();
+  }));
+}
+
+// ---------- auth ----------
+function doBootstrap(login, nome, senha){
+  state.bootstrapError = "";
+  if(!login || !nome || !senha){ state.bootstrapError = "Preencha todos os campos."; render(); return; }
+  var email = loginParaEmail(login);
+  createUserWithEmailAndPassword(auth, email, senha).then(function(cred){
+    var uid = cred.user.uid;
+    return setDoc(doc(db,"perfis",uid), {login:login.trim().toLowerCase(), nome:nome, setor:"admin"})
+      .then(function(){ return setDoc(doc(db,"meta","bootstrap"), {criadoEm:new Date().toISOString(), por:login}); });
+  }).catch(function(e){
+    state.bootstrapError = "Não foi possível criar a conta (" + (e.code||"erro") + "). Tente novamente.";
+    render();
+  });
+}
+function doLogin(login, senha){
+  if(!login || !senha){ state.loginError = "Preencha usuário e senha."; render(); return; }
+  state.loginError = "";
+  signInWithEmailAndPassword(auth, loginParaEmail(login), senha).catch(function(){
+    state.loginError = "Usuário ou senha inválidos.";
+    render();
+  });
+}
+function doLogout(){ signOut(auth); state.view = "login"; }
+
+// ---------- estoque ops ----------
+function ajustarEstoque(id, categoria, cor, tamanho, unidade, delta, criarSeNaoExiste){
+  var ref = doc(db,"estoque",id);
+  return getDoc(ref).then(function(snap){
+    if(snap.exists()){
+      var novaQtd = (Number(snap.data().quantidade)||0) + delta;
+      return updateDoc(ref, {quantidade: novaQtd, atualizadoEm: new Date().toISOString()});
+    } else if(criarSeNaoExiste){
+      return setDoc(ref, {
+        categoria: categoria, cor: cor||"", tamanho: tamanho||"", unidade: unidade||"un",
+        quantidade: delta, minimo: 0, criadoEm: new Date().toISOString(), atualizadoEm: new Date().toISOString()
+      });
+    }
+  });
+}
+
+// ---------- render root ----------
+function render(){
+  var appEl = $("#app");
+  appEl.innerHTML = "";
+  if(state.loading){
+    appEl.appendChild(el("div",{style:"min-height:100vh;display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:14px;"}, "Carregando CaruFlex Produção…"));
+    return;
+  }
+  if(CONFIG_PENDENTE){ appEl.appendChild(renderConfigPendente()); return; }
+  if(state.bootstrapNecessario){ appEl.appendChild(renderBootstrap()); return; }
+  if(!state.user){ appEl.appendChild(renderLogin()); return; }
+  appEl.appendChild(renderShell());
+}
+function renderConfigPendente(){
+  var wrap = el("div", {class:"login-wrap"});
+  wrap.appendChild(el("div", {class:"card login-card"},
+    '<div class="login-logo"><div class="brand-mark">CF</div><h1>CaruFlex Produção</h1></div>' +
+    '<div class="error-msg">Este arquivo ainda não foi configurado: abra o HTML publicado, localize o bloco "firebaseConfig" no início do &lt;script&gt; e cole os dados do seu projeto Firebase gratuito (Configurações do projeto → Seus apps).</div>'
+  ));
+  return wrap;
+}
+function renderBootstrap(){
+  var wrap = el("div", {class:"login-wrap"});
+  var card = el("div", {class:"card login-card"});
+  card.innerHTML =
+    '<div class="login-logo"><div class="brand-mark">CF</div><h1>Configuração inicial</h1><p>Nenhum administrador foi criado ainda. Crie a primeira conta (setor Admin) para começar a usar o sistema.</p></div>' +
+    (state.bootstrapError ? '<div class="error-msg">'+esc(state.bootstrapError)+'</div>' : "") +
+    '<form id="bootstrap-form">' +
+      '<div class="field"><label for="b-nome">Seu nome</label><input id="b-nome" required></div>' +
+      '<div class="field"><label for="b-login">Usuário (login)</label><input id="b-login" placeholder="ex: admin" required></div>' +
+      '<div class="field"><label for="b-senha">Senha</label><input id="b-senha" type="password" minlength="6" required></div>' +
+      '<button class="btn btn-primary btn-block" type="submit">Criar administrador</button>' +
+    '</form>';
+  wrap.appendChild(card);
+  setTimeout(function(){
+    $("#bootstrap-form", wrap).addEventListener("submit", function(e){
+      e.preventDefault();
+      doBootstrap($("#b-login",wrap).value, $("#b-nome",wrap).value, $("#b-senha",wrap).value);
+    });
+  },0);
+  return wrap;
+}
+function renderLogin(){
+  var wrap = el("div", {class:"login-wrap"});
+  var card = el("div", {class:"card login-card"});
+  card.innerHTML =
+    '<div class="login-logo"><div class="brand-mark">CF</div><h1>CaruFlex Produção</h1><p>Gestão de estoque e ordens de produção</p></div>' +
+    (state.loginError ? '<div class="error-msg">'+esc(state.loginError)+'</div>' : "") +
+    '<form id="login-form">' +
+      '<div class="field"><label for="f-user">Usuário</label><input id="f-user" autocomplete="username" placeholder="ex: comercial" required></div>' +
+      '<div class="field"><label for="f-pass">Senha</label><input id="f-pass" type="password" autocomplete="current-password" required></div>' +
+      '<button class="btn btn-primary btn-block" type="submit">Entrar</button>' +
+    '</form>';
+  wrap.appendChild(card);
+  setTimeout(function(){
+    $("#login-form", wrap).addEventListener("submit", function(e){
+      e.preventDefault();
+      doLogin($("#f-user",wrap).value, $("#f-pass",wrap).value);
+    });
+  },0);
+  return wrap;
+}
+function tabsFor(setor){
+  var tabs = [];
+  if(setor==="comercial"||setor==="admin") tabs.push({id:"novoPedido", label:"Novo Pedido"});
+  tabs.push({id:"pedidos", label:"Pedidos"});
+  if(setor==="producao"||setor==="admin") tabs.push({id:"recebimento", label:"Recebimento", count: countByStatus("enviado")});
+  if(setor==="producao"||setor==="admin") tabs.push({id:"conclusao", label:"Conclusão", count: countByStatus("recebido")});
+  tabs.push({id:"estoque", label:"Estoque"});
+  if(setor==="admin") tabs.push({id:"admin", label:"Admin"});
+  return tabs;
+}
+function countByStatus(s){ return state.cache.pedidos.filter(function(p){ return p.status===s; }).length; }
+
+function renderShell(){
+  var wrap = el("div", {id:"shell"});
+  var top = el("div", {class:"topbar"});
+  top.innerHTML =
+    '<div class="brand"><div class="brand-mark">CF</div><div><div class="brand-text">CaruFlex</div><div class="brand-sub">sacolas personalizadas</div></div></div>' +
+    '<div class="user-chip"><div class="who"><div class="name">'+esc(state.user.nome||state.user.login)+'</div><div class="setor">'+esc(state.user.setor)+'</div></div>' +
+    '<div class="avatar">'+esc((state.user.nome||state.user.login).slice(0,1).toUpperCase())+'</div>' +
+    '<button class="btn btn-ghost btn-sm" id="btn-logout" type="button">Sair</button></div>';
+  wrap.appendChild(top);
+  var nav = el("nav", {class:"tabs"});
+  tabsFor(state.user.setor).forEach(function(t){
+    var b = el("button", {class:"tab"+(state.view===t.id?" active":""), "data-view":t.id, type:"button"});
+    b.innerHTML = esc(t.label) + (t.count ? ' <span class="count">'+t.count+'</span>' : "");
+    nav.appendChild(b);
+  });
+  wrap.appendChild(nav);
+  var main = el("main");
+  var content;
+  switch(state.view){
+    case "novoPedido": content = renderNovoPedido(); break;
+    case "pedidos": content = renderPedidos(); break;
+    case "recebimento": content = renderFila("enviado"); break;
+    case "conclusao": content = renderFila("recebido"); break;
+    case "estoque": content = renderEstoque(); break;
+    case "admin": content = renderAdmin(); break;
+    default: content = renderPedidos();
+  }
+  main.appendChild(content);
+  wrap.appendChild(main);
+  setTimeout(function(){
+    $("#btn-logout", wrap).addEventListener("click", doLogout);
+    wrap.querySelectorAll("nav.tabs .tab").forEach(function(b){
+      b.addEventListener("click", function(){ state.view = b.getAttribute("data-view"); render(); });
+    });
+    wireViewEvents(wrap);
+  }, 0);
+  return wrap;
+}
+
+// ---------- ESTOQUE ----------
+function renderEstoque(){
+  var box = el("div", {class:"stack"});
+  box.appendChild(el("div", {}, '<div class="section-title">Estoque de sacolas em branco</div><div class="section-sub">Matéria-prima disponível para personalização. Quantidades em vermelho estão no mínimo ou em falta.</div>'));
+  if(state.user.setor==="comercial" || state.user.setor==="admin"){
+    var addCard = el("div", {class:"card"});
+    addCard.innerHTML =
+      '<div class="section-title" style="font-size:15px;margin-bottom:10px;">Registrar entrada / ajuste de estoque</div>' +
+      '<form id="form-estoque-add">' +
+        '<div class="row">' +
+          '<div class="field"><label>Categoria</label><input name="categoria" list="dl-categorias" required></div>' +
+          '<div class="field"><label>Cor</label><input name="cor" list="dl-cores"></div>' +
+          '<div class="field"><label>Tamanho</label><input name="tamanho" list="dl-tamanhos" placeholder="ex: 30X40"></div>' +
+        '</div>' +
+        '<div class="row">' +
+          '<div class="field"><label>Unidade</label><select name="unidade"><option value="un">Unidades</option><option value="kg">Quilos (kg)</option><option value="milheiro">Milheiro</option></select></div>' +
+          '<div class="field"><label>Quantidade a somar (negativo subtrai)</label><input name="quantidade" type="number" step="any" required></div>' +
+          '<div class="field"><label>Estoque mínimo (alerta)</label><input name="minimo" type="number" step="any" value="0"></div>' +
+        '</div>' +
+        '<button class="btn btn-primary" type="submit">Salvar</button>' +
+      '</form>' + datalists();
+    box.appendChild(addCard);
+  }
+  var grouped = {};
+  state.cache.estoque.forEach(function(it){ (grouped[it.categoria||"Sem categoria"] = grouped[it.categoria||"Sem categoria"]||[]).push(it); });
+  var cats = Object.keys(grouped).sort();
+  if(cats.length===0){ box.appendChild(el("div",{class:"card empty-state"}, '<div class="glyph">📦</div>Nenhum item de estoque cadastrado ainda.')); return box; }
+  var tableCard = el("div", {class:"card"});
+  var html = "";
+  cats.forEach(function(cat){
+    html += '<div class="stock-cat">'+esc(cat)+'</div>';
+    html += '<table class="stock-table"><thead><tr><th>Cor</th><th>Tamanho</th><th>Unidade</th><th>Quantidade</th><th></th></tr></thead><tbody>';
+    grouped[cat].sort(function(a,b){return (a.cor||"").localeCompare(b.cor||"");}).forEach(function(it){
+      var baixo = (Number(it.quantidade)||0) <= (Number(it.minimo)||0);
+      html += '<tr><td>'+esc(it.cor||"—")+'</td><td>'+esc(it.tamanho||"—")+'</td><td>'+esc(it.unidade||"un")+'</td>' +
+        '<td class="qty-cell"><span class="chip '+(baixo?"chip-baixo":"chip-ok")+'">'+fmtNum(it.quantidade)+'</span></td>' +
+        '<td>'+((state.user.setor==="comercial"||state.user.setor==="admin") ? '<button class="btn btn-ghost btn-sm" data-quick-adjust="'+esc(it.id)+'" type="button">+/−</button>':"") +'</td></tr>';
+    });
+    html += "</tbody></table>";
+  });
+  tableCard.innerHTML = html;
+  box.appendChild(tableCard);
+  return box;
+}
+function datalists(){
+  var cats = Array.from(new Set(state.cache.estoque.map(function(i){return i.categoria;}).concat(CATEGORIAS_PADRAO).filter(Boolean)));
+  var cores = Array.from(new Set(state.cache.estoque.map(function(i){return i.cor;}).filter(Boolean)));
+  var tam = Array.from(new Set(state.cache.estoque.map(function(i){return i.tamanho;}).filter(Boolean)));
+  function opts(arr){ return arr.map(function(v){return '<option value="'+esc(v)+'">';}).join(""); }
+  return '<datalist id="dl-categorias">'+opts(cats)+'</datalist>' +
+         '<datalist id="dl-cores">'+opts(cores)+'</datalist>' +
+         '<datalist id="dl-tamanhos">'+opts(tam)+'</datalist>';
+}
+
+// ---------- NOVO PEDIDO ----------
+var novoPedidoItens = [{categoria:"",cor:"",tamanho:"",quantidade:"",unidade:"un",frente:"",verso:""}];
+function renderNovoPedido(){
+  var box = el("div");
+  box.innerHTML =
+    '<div class="section-title">Nova Ordem de Produção</div>' +
+    '<div class="section-sub">Ao enviar, o estoque das sacolas usadas é baixado automaticamente e a ordem segue para a produção.</div>' +
+    '<div class="card"><form id="form-pedido">' +
+      '<div class="row">' +
+        '<div class="field"><label>Nome do cliente *</label><input name="clienteNome" required></div>' +
+        '<div class="field"><label>Telefone</label><input name="clienteTelefone" placeholder="(00) 00000-0000"></div>' +
+      '</div>' +
+      '<div class="field"><label>Endereço de entrega</label><input name="clienteEndereco" placeholder="Endereço completo"></div>' +
+      '<div class="row">' +
+        '<div class="field"><label>Marca</label><input name="marca"></div>' +
+        '<div class="field"><label>Tipo de pedido</label><select name="tipoPedido">' +
+          '<option value="primeiro">1º Pedido</option><option value="repeticao">Repetição</option>' +
+          '<option value="novo">Pedido Novo</option><option value="alteracao">Pedido com Alteração</option></select></div>' +
+      '</div>' +
+      '<div class="field" id="wrap-alteracao" style="display:none"><label>Descrição da alteração</label><input name="alteracaoDescricao"></div>' +
+      '<div class="row">' +
+        '<div class="field"><label>Data do pedido</label><input name="dataPedido" type="date" value="'+todayInput()+'"></div>' +
+        '<div class="field"><label>Previsão de entrega (dias)</label><input name="previsaoDias" type="number" min="0"></div>' +
+        '<div class="field"><label>Vendedor</label><input name="vendedor" value="'+esc(state.user.nome||"")+'"></div>' +
+      '</div>' +
+      '<div class="row">' +
+        '<div class="field"><label>Produzido por</label><input name="produzidoPor" list="dl-producao" placeholder="Nome do responsável na produção"></div>' +
+        '<div class="field"><label>Pigmento</label><input name="pigmento"></div>' +
+        '<div class="field"><label>Cor de impressão</label><input name="corImpressao"></div>' +
+      '</div>' +
+      '<datalist id="dl-producao">' + state.cache.usuarios.filter(function(u){return u.setor==="producao";}).map(function(u){return '<option value="'+esc(u.nome||u.login)+'">';}).join("") + '</datalist>' +
+      '<div class="field"><label>Observações</label><textarea name="obs" rows="2"></textarea></div>' +
+      '<hr class="divider">' +
+      '<label style="margin-bottom:10px;">Itens do pedido (sacolas a personalizar)</label>' +
+      '<div class="stack" id="itens-container"></div>' +
+      '<button class="btn btn-ghost btn-sm" id="btn-add-item" type="button" style="margin-top:10px;">+ Adicionar item</button>' +
+      '<hr class="divider">' +
+      '<div class="field"><label>Arte aprovada pelo cliente (PDF, até 650KB)</label>' +
+        '<div class="file-input-wrap"><input type="file" name="arte" accept="application/pdf" id="input-arte"></div>' +
+        '<div class="hint">Anexe o PDF com a arte já aprovada pelo cliente. Arquivos maiores que 650KB não podem ser salvos — comprima o PDF antes.</div></div>' +
+      '<div id="pedido-erro" class="error-msg" style="display:none;"></div>' +
+      '<button class="btn btn-primary btn-block" type="submit" id="btn-enviar-pedido">Enviar para Produção</button>' +
+    '</form></div>' + datalists();
+  setTimeout(function(){ renderItensRows(); }, 0);
+  return box;
+}
+function renderItensRows(){
+  var cont = $("#itens-container");
+  if(!cont) return;
+  cont.innerHTML = "";
+  novoPedidoItens.forEach(function(it, idx){
+    var row = el("div", {class:"item-row"});
+    row.innerHTML =
+      '<div class="item-row-head"><span class="idx">Item '+(idx+1)+'</span>' +
+      (novoPedidoItens.length>1 ? '<button class="btn btn-danger btn-sm" type="button" data-remove-item="'+idx+'">Remover</button>' : '') + '</div>' +
+      '<div class="row">' +
+        '<div class="field"><label>Categoria</label><input list="dl-categorias" data-it="categoria" data-idx="'+idx+'" value="'+esc(it.categoria)+'"></div>' +
+        '<div class="field"><label>Cor</label><input list="dl-cores" data-it="cor" data-idx="'+idx+'" value="'+esc(it.cor)+'"></div>' +
+        '<div class="field"><label>Tamanho</label><input list="dl-tamanhos" data-it="tamanho" data-idx="'+idx+'" value="'+esc(it.tamanho)+'" placeholder="ex: 30X40"></div>' +
+      '</div>' +
+      '<div class="row">' +
+        '<div class="field"><label>Quantidade</label><input type="number" step="any" min="0" data-it="quantidade" data-idx="'+idx+'" value="'+esc(it.quantidade)+'"></div>' +
+        '<div class="field"><label>Unidade</label><select data-it="unidade" data-idx="'+idx+'">' +
+          ['un','kg','milheiro'].map(function(u){return '<option value="'+u+'"'+(it.unidade===u?" selected":"")+'>'+(u==='un'?'Unidades':u==='kg'?'Quilos (kg)':'Milheiro')+'</option>';}).join("") +
+          '</select></div>' +
+      '</div>' +
+      '<div class="row">' +
+        '<div class="field"><label>Impressão frente</label><input data-it="frente" data-idx="'+idx+'" value="'+esc(it.frente)+'" placeholder="ex: logo azul"></div>' +
+        '<div class="field"><label>Impressão verso</label><input data-it="verso" data-idx="'+idx+'" value="'+esc(it.verso)+'" placeholder="ex: sem impressão"></div>' +
+      '</div>';
+    cont.appendChild(row);
+  });
+  cont.querySelectorAll("[data-it]").forEach(function(inp){
+    inp.addEventListener("input", function(){ novoPedidoItens[Number(inp.getAttribute("data-idx"))][inp.getAttribute("data-it")] = inp.value; });
+  });
+  cont.querySelectorAll("[data-remove-item]").forEach(function(b){
+    b.addEventListener("click", function(){ novoPedidoItens.splice(Number(b.getAttribute("data-remove-item")),1); renderItensRows(); });
+  });
+}
+function readFileAsDataUrl(file){
+  return new Promise(function(resolve,reject){
+    var reader = new FileReader();
+    reader.onload = function(){ resolve(reader.result); };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+function submitPedido(form){
+  var erro = $("#pedido-erro");
+  erro.style.display = "none";
+  var fd = new FormData(form);
+  var clienteNome = (fd.get("clienteNome")||"").toString().trim();
+  var itensValidos = novoPedidoItens.filter(function(it){ return it.categoria && Number(it.quantidade)>0; });
+  if(!clienteNome){ erro.textContent="Informe o nome do cliente."; erro.style.display="block"; return; }
+  if(itensValidos.length===0){ erro.textContent="Adicione ao menos um item com categoria e quantidade."; erro.style.display="block"; return; }
+  var arteFile = $("#input-arte").files[0];
+  if(arteFile && arteFile.size > TAMANHO_MAX_ARTE){
+    erro.textContent = "O PDF da arte está muito grande (máx. 650KB). Comprima o arquivo e tente novamente.";
+    erro.style.display = "block"; return;
+  }
+  var btn = $("#btn-enviar-pedido");
+  btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Enviando…';
+
+  var uploadPromise = arteFile ? readFileAsDataUrl(arteFile) : Promise.resolve(null);
+  uploadPromise.then(function(dataUrl){
+    var numero = orderNumero();
+    var pedido = {
+      numero: numero,
+      criadoEm: new Date().toISOString(),
+      criadoPor: state.user.nome || state.user.login,
+      cliente: { nome: clienteNome, telefone: (fd.get("clienteTelefone")||"").toString(), endereco: (fd.get("clienteEndereco")||"").toString() },
+      marca: (fd.get("marca")||"").toString(),
+      tipoPedido: fd.get("tipoPedido"),
+      alteracaoDescricao: (fd.get("alteracaoDescricao")||"").toString(),
+      dataPedido: fd.get("dataPedido"),
+      previsaoDias: fd.get("previsaoDias") ? Number(fd.get("previsaoDias")) : null,
+      vendedor: (fd.get("vendedor")||"").toString(),
+      produzidoPor: (fd.get("produzidoPor")||"").toString(),
+      pigmento: (fd.get("pigmento")||"").toString(),
+      corImpressao: (fd.get("corImpressao")||"").toString(),
+      obs: (fd.get("obs")||"").toString(),
+      itens: itensValidos.map(function(it){
+        return {categoria:it.categoria, cor:it.cor||"", tamanho:it.tamanho||"", quantidade:Number(it.quantidade), unidade:it.unidade||"un", frente:it.frente||"", verso:it.verso||""};
+      }),
+      temArte: !!dataUrl, arteNome: arteFile ? arteFile.name : null,
+      status: "enviado"
+    };
+    var baixas = pedido.itens.map(function(it){
+      var id = estoqueId(it.categoria, it.cor, it.tamanho);
+      return ajustarEstoque(id, it.categoria, it.cor, it.tamanho, it.unidade, -Math.abs(it.quantidade), true);
+    });
+    Promise.all(baixas).then(function(){
+      return setDoc(doc(db,"pedidos",numero), pedido);
+    }).then(function(){
+      return dataUrl ? setDoc(doc(db,"artesPedidos",numero), {dataUrl:dataUrl, nome:arteFile.name, criadoEm:new Date().toISOString()}) : null;
+    }).then(function(){
+      toast("Ordem "+numero+" enviada para a produção.");
+      novoPedidoItens = [{categoria:"",cor:"",tamanho:"",quantidade:"",unidade:"un",frente:"",verso:""}];
+      state.view = "pedidos"; render();
+    }).catch(function(){
+      erro.textContent = "Não foi possível enviar a ordem agora. Tente novamente.";
+      erro.style.display = "block";
+      btn.disabled = false; btn.textContent = "Enviar para Produção";
+    });
+  });
+}
+
+// ---------- PEDIDOS (histórico) ----------
+function statusLabel(s){ return s==="enviado" ? "Enviado" : s==="recebido" ? "Recebido" : s==="concluido" ? "Concluído" : s; }
+function abrirArte(numero){
+  if(state.arteCache[numero]){ abrirBlobPdf(state.arteCache[numero]); return; }
+  toast("Abrindo arte…");
+  getDoc(doc(db,"artesPedidos",numero)).then(function(snap){
+    if(!snap.exists()){ toast("Arte não encontrada."); return; }
+    var dataUrl = snap.data().dataUrl;
+    state.arteCache[numero] = dataUrl;
+    abrirBlobPdf(dataUrl);
+  }).catch(function(){ toast("Não foi possível abrir a arte agora."); });
+}
+function abrirBlobPdf(dataUrl){
+  try{
+    var parts = dataUrl.split(",");
+    var byteChars = atob(parts[1]);
+    var bytes = new Uint8Array(byteChars.length);
+    for(var i=0;i<byteChars.length;i++) bytes[i]=byteChars.charCodeAt(i);
+    var blob = new Blob([bytes], {type:"application/pdf"});
+    window.open(URL.createObjectURL(blob), "_blank");
+  }catch(e){ toast("Não foi possível abrir a arte."); }
+}
+function renderPedidoCard(p){
+  var card = el("div", {class:"order-card st-"+p.status});
+  var itensHtml = (p.itens||[]).map(function(it){
+    return '<div class="it"><span>'+esc(it.categoria)+(it.cor?" · "+esc(it.cor):"")+(it.tamanho?" · "+esc(it.tamanho):"")+'</span><span class="qty">'+fmtNum(it.quantidade)+' '+esc(it.unidade)+'</span></div>';
+  }).join("");
+  var arteBtn = p.temArte ? '<button class="btn btn-ghost btn-sm" type="button" data-ver-arte="'+esc(p.numero)+'">Ver arte (PDF)</button>' : '<span class="hint">Sem arte anexada</span>';
+  card.innerHTML =
+    '<div class="order-head"><div><div class="order-num">'+esc(p.numero)+' · '+esc(p.cliente && p.cliente.nome)+'</div>' +
+    '<div class="order-meta">'+esc(p.marca||"—")+' · Vendedor: '+esc(p.vendedor||"—")+'</div></div>' +
+    '<span class="chip chip-'+p.status+'">'+statusLabel(p.status)+'</span></div>' +
+    '<div class="order-items">'+itensHtml+'</div>' +
+    '<div class="order-foot"><div class="timeline">' +
+      '<span>Criado: '+fmtDate(p.criadoEm)+'</span>' +
+      (p.recebidoEm ? '<span>Recebido: '+fmtDate(p.recebidoEm)+'</span>' : "") +
+      (p.concluidoEm ? '<span>Concluído: '+fmtDate(p.concluidoEm)+'</span>' : "") +
+    '</div>'+arteBtn+'</div>';
+  return card;
+}
+function renderPedidos(){
+  var box = el("div");
+  box.appendChild(el("div", {}, '<div class="section-title">Pedidos</div><div class="section-sub">Histórico e acompanhamento de todas as ordens de produção.</div>'));
+  var filters = el("div", {class:"filter-row"});
+  [["todos","Todos"],["enviado","Enviados"],["recebido","Recebidos"],["concluido","Concluídos"]].forEach(function(f){
+    filters.appendChild(el("button", {"data-filtro":f[0], type:"button", class: state.filtroPedidos===f[0]?"active":""}, esc(f[1])));
+  });
+  box.appendChild(filters);
+  var list = state.cache.pedidos.filter(function(p){ return state.filtroPedidos==="todos" || p.status===state.filtroPedidos; });
+  var listWrap = el("div", {class:"stack"});
+  if(list.length===0){ listWrap.appendChild(el("div",{class:"card empty-state"}, '<div class="glyph">🗂️</div>Nenhum pedido encontrado.')); }
+  else { list.forEach(function(p){ listWrap.appendChild(renderPedidoCard(p)); }); }
+  box.appendChild(listWrap);
+  return box;
+}
+function renderFila(statusAlvo){
+  var box = el("div");
+  var titulo = statusAlvo==="enviado" ? "Confirmação de Recebimento" : "Confirmação de Conclusão";
+  var sub = statusAlvo==="enviado" ? "Ordens enviadas pelo comercial aguardando confirmação de recebimento pela produção." : "Ordens recebidas pela produção aguardando confirmação de conclusão.";
+  box.innerHTML = '<div class="section-title">'+titulo+'</div><div class="section-sub">'+sub+'</div>';
+  var list = state.cache.pedidos.filter(function(p){ return p.status===statusAlvo; });
+  var listWrap = el("div", {class:"stack"});
+  if(list.length===0){ listWrap.appendChild(el("div",{class:"card empty-state"}, '<div class="glyph">✅</div>Nenhuma ordem pendente aqui no momento.')); }
+  else {
+    list.forEach(function(p){
+      var card = renderPedidoCard(p);
+      var actionBtn = el("button", {class:"btn btn-success btn-block", type:"button", style:"margin-top:10px;", "data-confirmar":p.numero, "data-alvo": statusAlvo==="enviado"?"recebido":"concluido"},
+        statusAlvo==="enviado" ? "Confirmar Recebimento" : "Confirmar Conclusão");
+      card.appendChild(actionBtn);
+      listWrap.appendChild(card);
+    });
+  }
+  box.appendChild(listWrap);
+  return box;
+}
+function confirmarStatus(numero, novoStatus){
+  var campoPor = novoStatus==="recebido" ? "recebidoPor" : "concluidoPor";
+  var campoEm = novoStatus==="recebido" ? "recebidoEm" : "concluidoEm";
+  var patch = {status: novoStatus};
+  patch[campoPor] = state.user.nome || state.user.login;
+  patch[campoEm] = new Date().toISOString();
+  updateDoc(doc(db,"pedidos",numero), patch).then(function(){
+    toast("Ordem "+numero+" marcada como "+statusLabel(novoStatus)+".");
+  }).catch(function(){ toast("Não foi possível atualizar agora. Tente novamente."); });
+}
+
+// ---------- ADMIN ----------
+function renderAdmin(){
+  var box = el("div", {class:"stack"});
+  box.appendChild(el("div", {}, '<div class="section-title">Administração</div><div class="section-sub">Gerenciar usuários dos setores.</div>'));
+  var formCard = el("div", {class:"card"});
+  formCard.innerHTML =
+    '<div class="section-title" style="font-size:15px;margin-bottom:10px;">Novo usuário</div>' +
+    '<form id="form-usuario">' +
+      '<div class="row">' +
+        '<div class="field"><label>Usuário (login)</label><input name="login" required placeholder="ex: producao"></div>' +
+        '<div class="field"><label>Nome</label><input name="nome" required></div>' +
+      '</div>' +
+      '<div class="row">' +
+        '<div class="field"><label>Senha (mín. 6 caracteres)</label><input name="senha" minlength="6" required></div>' +
+        '<div class="field"><label>Setor</label><select name="setor"><option value="comercial">Comercial</option><option value="producao">Produção</option><option value="admin">Admin</option></select></div>' +
+      '</div>' +
+      '<button class="btn btn-primary" type="submit">Criar usuário</button>' +
+    '</form>';
+  box.appendChild(formCard);
+  var listCard = el("div", {class:"card"});
+  var rows = state.cache.usuarios.map(function(u){
+    return '<tr><td>'+esc(u.login)+'</td><td>'+esc(u.nome||"—")+'</td><td><span class="badge-role">'+esc(u.setor)+'</span></td></tr>';
+  }).join("");
+  listCard.innerHTML = '<table class="stock-table"><thead><tr><th>Login</th><th>Nome</th><th>Setor</th></tr></thead><tbody>'+(rows||'<tr><td colspan="3" style="color:var(--text-muted)">Nenhum usuário ainda.</td></tr>')+'</tbody></table>';
+  box.appendChild(listCard);
+  return box;
+}
+function criarUsuario(login, nome, senha, setor){
+  var email = loginParaEmail(login);
+  var secApp = initializeApp(firebaseConfig, "secundario-"+Date.now());
+  var secAuth = getAuth(secApp);
+  return createUserWithEmailAndPassword(secAuth, email, senha).then(function(cred){
+    var novoUid = cred.user.uid;
+    return signOut(secAuth).then(function(){ return deleteApp(secApp); }).then(function(){
+      return setDoc(doc(db,"perfis",novoUid), {login: login.trim().toLowerCase(), nome:nome, setor:setor});
+    });
+  }).catch(function(e){
+    return deleteApp(secApp).catch(function(){}).then(function(){ throw e; });
+  });
+}
+
+// ---------- wiring per view ----------
+function wireViewEvents(root){
+  var tipoPedidoSel = root.querySelector('select[name="tipoPedido"]');
+  if(tipoPedidoSel) tipoPedidoSel.addEventListener("change", function(){ $("#wrap-alteracao").style.display = tipoPedidoSel.value==="alteracao" ? "block" : "none"; });
+  var btnAddItem = $("#btn-add-item", root);
+  if(btnAddItem) btnAddItem.addEventListener("click", function(){ novoPedidoItens.push({categoria:"",cor:"",tamanho:"",quantidade:"",unidade:"un",frente:"",verso:""}); renderItensRows(); });
+  var formPedido = $("#form-pedido", root);
+  if(formPedido) formPedido.addEventListener("submit", function(e){ e.preventDefault(); submitPedido(formPedido); });
+  root.querySelectorAll("[data-filtro]").forEach(function(b){ b.addEventListener("click", function(){ state.filtroPedidos = b.getAttribute("data-filtro"); render(); }); });
+  root.querySelectorAll("[data-confirmar]").forEach(function(b){
+    b.addEventListener("click", function(){ b.disabled = true; b.innerHTML = '<span class="spinner"></span>'; confirmarStatus(b.getAttribute("data-confirmar"), b.getAttribute("data-alvo")); });
+  });
+  root.querySelectorAll("[data-ver-arte]").forEach(function(b){ b.addEventListener("click", function(){ abrirArte(b.getAttribute("data-ver-arte")); }); });
+  var formEstoqueAdd = $("#form-estoque-add", root);
+  if(formEstoqueAdd) formEstoqueAdd.addEventListener("submit", function(e){
+    e.preventDefault();
+    var fd = new FormData(formEstoqueAdd);
+    var categoria = (fd.get("categoria")||"").toString().trim();
+    var cor = (fd.get("cor")||"").toString().trim();
+    var tamanho = (fd.get("tamanho")||"").toString().trim();
+    var unidade = fd.get("unidade");
+    var quantidade = Number(fd.get("quantidade"))||0;
+    var minimo = Number(fd.get("minimo"))||0;
+    if(!categoria || !quantidade){ toast("Informe categoria e quantidade."); return; }
+    var id = estoqueId(categoria,cor,tamanho);
+    var ref = doc(db,"estoque",id);
+    getDoc(ref).then(function(snap){
+      if(snap.exists()){ return updateDoc(ref, {quantidade:(Number(snap.data().quantidade)||0)+quantidade, minimo: minimo || snap.data().minimo || 0, unidade: unidade, atualizadoEm: new Date().toISOString()}); }
+      else { return setDoc(ref, {categoria:categoria, cor:cor, tamanho:tamanho, unidade:unidade, quantidade:quantidade, minimo:minimo, criadoEm:new Date().toISOString(), atualizadoEm:new Date().toISOString()}); }
+    }).then(function(){ toast("Estoque atualizado."); formEstoqueAdd.reset(); }).catch(function(){ toast("Não foi possível salvar agora."); });
+  });
+  root.querySelectorAll("[data-quick-adjust]").forEach(function(b){
+    b.addEventListener("click", function(){
+      var id = b.getAttribute("data-quick-adjust");
+      var it = state.cache.estoque.find(function(x){return x.id===id;});
+      if(!it) return;
+      var v = window.prompt("Ajustar quantidade de "+it.categoria+" "+(it.cor||"")+" "+(it.tamanho||"")+"\nDigite a quantidade a somar (use negativo para subtrair):","0");
+      if(v===null) return;
+      var delta = Number(v);
+      if(isNaN(delta) || delta===0) return;
+      ajustarEstoque(id, it.categoria, it.cor, it.tamanho, it.unidade, delta, true).then(function(){ toast("Estoque ajustado."); });
+    });
+  });
+  var formUsuario = $("#form-usuario", root);
+  if(formUsuario) formUsuario.addEventListener("submit", function(e){
+    e.preventDefault();
+    var fd = new FormData(formUsuario);
+    var login = (fd.get("login")||"").toString().trim();
+    if(!login){ toast("Informe o login do usuário."); return; }
+    var btn = formUsuario.querySelector('button[type="submit"]');
+    btn.disabled = true;
+    criarUsuario(login, (fd.get("nome")||"").toString(), (fd.get("senha")||"").toString(), fd.get("setor")).then(function(){
+      toast("Usuário criado."); formUsuario.reset(); btn.disabled = false;
+    }).catch(function(e){
+      toast("Não foi possível criar (" + (e.code||"erro") + ")."); btn.disabled = false;
+    });
+  });
+}
+
+boot();
+</script>
+</body>
+</html>
