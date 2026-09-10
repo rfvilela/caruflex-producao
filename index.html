@@ -105,7 +105,29 @@ main{flex:1; padding:18px; max-width:1000px; width:100%; margin:0 auto;}
 .chip-concluido{background:var(--success-soft); color:var(--success);}
 .chip-baixo{background:var(--danger-soft); color:var(--danger);}
 .chip-ok{background:var(--success-soft); color:var(--success);}
-.order-card{border:1px solid var(--border); border-radius:12px; padding:14px 16px; background:var(--surface); position:relative; overflow:hidden;}
+.order-card{border:1px solid var(--border); border-radius:12px; padding:14px 16px; background:var(--surface); position:relative; overflow:hidden; cursor:pointer; transition:box-shadow .15s ease;}
+.order-card:hover{box-shadow:0 2px 10px rgba(0,0,0,.08);}
+.modal-overlay{position:fixed; inset:0; background:rgba(10,14,18,.55); display:flex; align-items:flex-end; justify-content:center; z-index:50; opacity:0; transition:opacity .15s ease;}
+.modal-overlay.show{opacity:1;}
+.modal-overlay[hidden]{display:none;}
+.modal-box{background:var(--surface); border-radius:16px 16px 0 0; max-width:560px; width:100%; max-height:88vh; overflow-y:auto; padding:20px 20px 24px; box-shadow:0 -6px 24px rgba(0,0,0,.18); transform:translateY(16px); transition:transform .15s ease;}
+.modal-overlay.show .modal-box{transform:translateY(0);}
+@media (min-width:640px){
+  .modal-overlay{align-items:center;}
+  .modal-box{border-radius:16px; margin:16px;}
+}
+.modal-head{display:flex; align-items:flex-start; gap:10px; margin-bottom:14px;}
+.modal-head > div:first-child{flex:1;}
+.modal-close{background:none; border:none; font-size:22px; line-height:1; color:var(--text-muted); cursor:pointer; padding:2px 6px;}
+.modal-close:hover{color:var(--text);}
+.detalhe-grid{display:grid; grid-template-columns:1fr 1fr; gap:10px 16px; margin-bottom:14px;}
+.detalhe-grid .span2{grid-column:1 / -1;}
+.detalhe-grid label{display:block; font-size:11.5px; font-weight:600; color:var(--text-muted); margin-bottom:2px; letter-spacing:.02em;}
+.detalhe-grid > div > div:last-child{font-size:14px;}
+.detalhe-item{border:1px solid var(--border); border-radius:10px; padding:8px 10px;}
+.detalhe-item-head{display:flex; justify-content:space-between; font-size:14px; gap:10px;}
+.detalhe-item-imp{font-size:12.5px; color:var(--text-muted); margin-top:4px;}
+@media (max-width:640px){ .detalhe-grid{grid-template-columns:1fr;} }
 .order-card::before{content:""; position:absolute; left:0; top:0; bottom:0; width:4px;}
 .order-card.st-enviado::before{background:var(--accent);}
 .order-card.st-recebido::before{background:var(--warning);}
@@ -162,6 +184,7 @@ main{flex:1; padding:18px; max-width:1000px; width:100%; margin:0 auto;}
 <body>
 <div id="app"></div>
 <div class="toast" id="toast"></div>
+<div id="modal-op" class="modal-overlay" hidden><div class="modal-box"></div></div>
 
 <script type="module">
 import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js";
@@ -722,8 +745,76 @@ function abrirBlobPdf(dataUrl){
     window.open(URL.createObjectURL(blob), "_blank");
   }catch(e){ toast("Não foi possível abrir a arte."); }
 }
+function tipoPedidoLabel(t){
+  return t==="primeiro" ? "1º Pedido" : t==="repeticao" ? "Repetição" : t==="novo" ? "Pedido Novo" : t==="alteracao" ? "Pedido com Alteração" : (t||"—");
+}
+function abrirDetalhePedido(numero){
+  var p = state.cache.pedidos.filter(function(x){ return x.numero===numero; })[0];
+  if(!p){ toast("Pedido não encontrado."); return; }
+  var modal = $("#modal-op");
+  var box = $(".modal-box", modal);
+  var itensHtml = (p.itens||[]).map(function(it){
+    return '<div class="detalhe-item">' +
+      '<div class="detalhe-item-head"><span>'+esc(it.categoria)+(it.cor?" · "+esc(it.cor):"")+(it.tamanho?" · "+esc(it.tamanho):"")+'</span><span class="qty">'+fmtNum(it.quantidade)+' '+esc(it.unidade)+'</span></div>' +
+      ((it.frente||it.verso) ? '<div class="detalhe-item-imp">'+(it.frente?"Frente: "+esc(it.frente):"")+(it.frente&&it.verso?" · ":"")+(it.verso?"Verso: "+esc(it.verso):"")+'</div>' : "") +
+    '</div>';
+  }).join("") || '<div class="hint">Nenhum item.</div>';
+  var podeConfirmar = state.user && (state.user.setor==="producao" || state.user.setor==="admin");
+  var confirmBtn = "";
+  if(podeConfirmar && p.status==="enviado"){
+    confirmBtn = '<button class="btn btn-success btn-sm" type="button" data-confirmar="'+esc(p.numero)+'" data-alvo="recebido">Confirmar Recebimento</button>';
+  } else if(podeConfirmar && p.status==="recebido"){
+    confirmBtn = '<button class="btn btn-success btn-sm" type="button" data-confirmar="'+esc(p.numero)+'" data-alvo="concluido">Confirmar Conclusão</button>';
+  }
+  var arteBtn = p.temArte ? '<button class="btn btn-ghost btn-sm" type="button" data-ver-arte="'+esc(p.numero)+'">Ver arte (PDF)</button>' : '<span class="hint">Sem arte anexada</span>';
+  box.innerHTML =
+    '<div class="modal-head"><div><div class="order-num">'+esc(p.numero)+'</div><div class="order-meta">'+esc(p.cliente && p.cliente.nome)+'</div></div>' +
+    '<span class="chip chip-'+p.status+'">'+statusLabel(p.status)+'</span>' +
+    '<button class="modal-close" type="button" id="modal-op-fechar" aria-label="Fechar">&times;</button></div>' +
+    '<div class="detalhe-grid">' +
+      '<div><label>Cliente</label><div>'+esc((p.cliente && p.cliente.nome) || "—")+'</div></div>' +
+      '<div><label>Telefone</label><div>'+esc((p.cliente && p.cliente.telefone) || "—")+'</div></div>' +
+      '<div class="span2"><label>Endereço</label><div>'+esc((p.cliente && p.cliente.endereco) || "—")+'</div></div>' +
+      '<div><label>Marca</label><div>'+esc(p.marca||"—")+'</div></div>' +
+      '<div><label>Tipo de pedido</label><div>'+esc(tipoPedidoLabel(p.tipoPedido))+'</div></div>' +
+      (p.alteracaoDescricao ? '<div class="span2"><label>Descrição da alteração</label><div>'+esc(p.alteracaoDescricao)+'</div></div>' : "") +
+      '<div><label>Previsão de entrega</label><div>'+(p.previsaoDias!=null ? esc(p.previsaoDias)+" dia(s)" : "—")+'</div></div>' +
+      '<div><label>Vendedor</label><div>'+esc(p.vendedor||"—")+'</div></div>' +
+      '<div><label>Produzido por</label><div>'+esc(p.produzidoPor||"—")+'</div></div>' +
+      '<div><label>Pigmento</label><div>'+esc(p.pigmento||"—")+'</div></div>' +
+      '<div><label>Cor de impressão</label><div>'+esc(p.corImpressao||"—")+'</div></div>' +
+      (p.obs ? '<div class="span2"><label>Observações</label><div>'+esc(p.obs)+'</div></div>' : "") +
+    '</div>' +
+    '<hr class="divider">' +
+    '<label style="margin-bottom:8px;display:block;">Itens</label>' +
+    '<div class="stack">'+itensHtml+'</div>' +
+    '<hr class="divider">' +
+    '<div class="timeline">' +
+      '<span>Criado: '+fmtDate(p.criadoEm)+(p.criadoPor?" ("+esc(p.criadoPor)+")":"")+'</span>' +
+      (p.recebidoEm ? '<span>Recebido: '+fmtDate(p.recebidoEm)+(p.recebidoPor?" ("+esc(p.recebidoPor)+")":"")+'</span>' : "") +
+      (p.concluidoEm ? '<span>Concluído: '+fmtDate(p.concluidoEm)+(p.concluidoPor?" ("+esc(p.concluidoPor)+")":"")+'</span>' : "") +
+    '</div>' +
+    '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;">'+arteBtn+confirmBtn+'</div>';
+  box.querySelectorAll("[data-ver-arte]").forEach(function(b){ b.addEventListener("click", function(){ abrirArte(b.getAttribute("data-ver-arte")); }); });
+  box.querySelectorAll("[data-confirmar]").forEach(function(b){
+    b.addEventListener("click", function(){
+      b.disabled = true; b.innerHTML = '<span class="spinner"></span>';
+      confirmarStatus(b.getAttribute("data-confirmar"), b.getAttribute("data-alvo"));
+      fecharModalPedido();
+    });
+  });
+  $("#modal-op-fechar", box).addEventListener("click", fecharModalPedido);
+  modal.hidden = false;
+  requestAnimationFrame(function(){ modal.classList.add("show"); });
+}
+function fecharModalPedido(){
+  var modal = $("#modal-op");
+  if(!modal) return;
+  modal.classList.remove("show");
+  setTimeout(function(){ modal.hidden = true; }, 150);
+}
 function renderPedidoCard(p){
-  var card = el("div", {class:"order-card st-"+p.status});
+  var card = el("div", {class:"order-card st-"+p.status, "data-abrir-op": p.numero});
   var itensHtml = (p.itens||[]).map(function(it){
     return '<div class="it"><span>'+esc(it.categoria)+(it.cor?" · "+esc(it.cor):"")+(it.tamanho?" · "+esc(it.tamanho):"")+'</span><span class="qty">'+fmtNum(it.quantidade)+' '+esc(it.unidade)+'</span></div>';
   }).join("");
@@ -828,6 +919,12 @@ function wireViewEvents(root){
     b.addEventListener("click", function(){ b.disabled = true; b.innerHTML = '<span class="spinner"></span>'; confirmarStatus(b.getAttribute("data-confirmar"), b.getAttribute("data-alvo")); });
   });
   root.querySelectorAll("[data-ver-arte]").forEach(function(b){ b.addEventListener("click", function(){ abrirArte(b.getAttribute("data-ver-arte")); }); });
+  root.querySelectorAll("[data-abrir-op]").forEach(function(c){
+    c.addEventListener("click", function(e){
+      if(e.target.closest("button")) return;
+      abrirDetalhePedido(c.getAttribute("data-abrir-op"));
+    });
+  });
   var formEstoqueAdd = $("#form-estoque-add", root);
   if(formEstoqueAdd) formEstoqueAdd.addEventListener("submit", function(e){
     e.preventDefault();
@@ -874,6 +971,13 @@ function wireViewEvents(root){
   });
 }
 
+(function(){
+  var modalOverlay = document.getElementById("modal-op");
+  if(modalOverlay){
+    modalOverlay.addEventListener("click", function(e){ if(e.target===modalOverlay) fecharModalPedido(); });
+  }
+  document.addEventListener("keydown", function(e){ if(e.key==="Escape") fecharModalPedido(); });
+})();
 boot();
 </script>
 </body>
