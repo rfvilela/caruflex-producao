@@ -22,6 +22,8 @@
   --warning-soft:#FBF0DC;
   --danger:#B23A34;
   --danger-soft:#FBE7E5;
+  --pending:#6B4FA0;
+  --pending-soft:#EFE8F7;
   --shadow: 0 1px 2px rgba(20,30,38,.06), 0 4px 16px rgba(20,30,38,.05);
   --radius: 14px;
   color-scheme: light;
@@ -31,6 +33,7 @@
     --bg:#111820; --surface:#1A232C; --surface-2:#212C35; --border:#333F4A; --text:#E8EEF2; --text-muted:#9AAAB6;
     --accent:#5FB2D6; --accent-strong:#8CCBE5; --accent-soft:#1E3540; --success:#4FBE8A; --success-soft:#173028;
     --warning:#E3AC48; --warning-soft:#332711; --danger:#E2726C; --danger-soft:#3A1E1C;
+    --pending:#B79AE0; --pending-soft:#2C2440;
     --shadow: 0 1px 2px rgba(0,0,0,.3), 0 6px 20px rgba(0,0,0,.35); color-scheme: dark;
   }
 }
@@ -38,6 +41,7 @@
   --bg:#111820; --surface:#1A232C; --surface-2:#212C35; --border:#333F4A; --text:#E8EEF2; --text-muted:#9AAAB6;
   --accent:#5FB2D6; --accent-strong:#8CCBE5; --accent-soft:#1E3540; --success:#4FBE8A; --success-soft:#173028;
   --warning:#E3AC48; --warning-soft:#332711; --danger:#E2726C; --danger-soft:#3A1E1C;
+  --pending:#B79AE0; --pending-soft:#2C2440;
   --shadow: 0 1px 2px rgba(0,0,0,.3), 0 6px 20px rgba(0,0,0,.35); color-scheme: dark;
 }
 *{box-sizing:border-box;}
@@ -103,6 +107,7 @@ main{flex:1; padding:18px; max-width:1000px; width:100%; margin:0 auto;}
 .chip-enviado{background:var(--accent-soft); color:var(--accent-strong);}
 .chip-recebido{background:var(--warning-soft); color:var(--warning);}
 .chip-concluido{background:var(--success-soft); color:var(--success);}
+.chip-aguardando_aprovacao{background:var(--pending-soft); color:var(--pending);}
 .chip-baixo{background:var(--danger-soft); color:var(--danger);}
 .chip-ok{background:var(--success-soft); color:var(--success);}
 .order-card{border:1px solid var(--border); border-radius:12px; padding:14px 16px; background:var(--surface); position:relative; overflow:hidden; cursor:pointer; transition:box-shadow .15s ease;}
@@ -132,6 +137,7 @@ main{flex:1; padding:18px; max-width:1000px; width:100%; margin:0 auto;}
 .order-card.st-enviado::before{background:var(--accent);}
 .order-card.st-recebido::before{background:var(--warning);}
 .order-card.st-concluido::before{background:var(--success);}
+.order-card.st-aguardando_aprovacao::before{background:var(--pending);}
 .order-head{display:flex; justify-content:space-between; align-items:flex-start; gap:10px; margin-bottom:8px;}
 .order-num{font-weight:700; font-size:15px;}
 .order-meta{color:var(--text-muted); font-size:12.5px; margin-top:2px;}
@@ -254,6 +260,20 @@ function loginParaEmail(login){
   return limpo + "@caruflex.local";
 }
 function fmtNum(n){ n = Number(n)||0; return n.toLocaleString("pt-BR", {maximumFractionDigits:3}); }
+function fmtMoeda(n){ return "R$ " + (Number(n)||0).toLocaleString("pt-BR", {minimumFractionDigits:2, maximumFractionDigits:2}); }
+function calcularValorUnitario(valorPedido, itens){
+  var totalQtd = (itens||[]).reduce(function(s,it){ return s + (Number(it.quantidade)||0); }, 0);
+  if(!totalQtd) return 0;
+  return (Number(valorPedido)||0) / totalQtd;
+}
+function atualizarValorUnitarioPreview(form, itensArr){
+  if(!form) return;
+  var campoValor = form.querySelector('[name="valorPedido"]');
+  var campoUnit = form.querySelector('[name="valorUnitarioPreview"]');
+  if(!campoValor || !campoUnit) return;
+  var unit = calcularValorUnitario(campoValor.value, itensArr);
+  campoUnit.value = unit ? unit.toLocaleString("pt-BR", {minimumFractionDigits:2, maximumFractionDigits:2}) : "";
+}
 function fmtDate(iso){
   if(!iso) return "—";
   try{ var d = new Date(iso); return d.toLocaleDateString("pt-BR")+" "+d.toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"}); }
@@ -874,6 +894,10 @@ function renderNovoPedido(){
       '</div>' +
       '<datalist id="dl-producao">' + state.cache.usuarios.filter(function(u){return u.setor==="producao";}).map(function(u){return '<option value="'+esc(u.nome||u.login)+'">';}).join("") + '</datalist>' +
       '<div class="field"><label>Observações</label><textarea name="obs" rows="2"></textarea></div>' +
+      '<div class="row">' +
+        '<div class="field"><label>Valor do pedido (R$)</label><input name="valorPedido" type="number" step="0.01" min="0" placeholder="0,00"></div>' +
+        '<div class="field"><label>Valor unitário (R$)</label><input name="valorUnitarioPreview" readonly placeholder="calculado automaticamente"></div>' +
+      '</div>' +
       '<hr class="divider">' +
       '<label style="margin-bottom:10px;">Itens do pedido (sacolas a personalizar)</label>' +
       '<div class="stack" id="itens-container"></div>' +
@@ -883,7 +907,7 @@ function renderNovoPedido(){
         '<div class="file-input-wrap"><input type="file" name="arte" accept="application/pdf" id="input-arte"></div>' +
         '<div class="hint">Anexe o PDF com a arte já aprovada pelo cliente. Arquivos maiores que 650KB não podem ser salvos — comprima o PDF antes.</div></div>' +
       '<div id="pedido-erro" class="error-msg" style="display:none;"></div>' +
-      '<button class="btn btn-primary btn-block" type="submit" id="btn-enviar-pedido">Enviar para Produção</button>' +
+      '<button class="btn btn-primary btn-block" type="submit" id="btn-enviar-pedido">Criar Pedido e Gerar PDF de Aprovação</button>' +
     '</form></div>' + datalists();
   setTimeout(function(){ renderItensRows(); }, 0);
   return box;
@@ -915,11 +939,12 @@ function renderItensRows(){
     cont.appendChild(row);
   });
   cont.querySelectorAll("[data-it]").forEach(function(inp){
-    inp.addEventListener("input", function(){ novoPedidoItens[Number(inp.getAttribute("data-idx"))][inp.getAttribute("data-it")] = inp.value; });
+    inp.addEventListener("input", function(){ novoPedidoItens[Number(inp.getAttribute("data-idx"))][inp.getAttribute("data-it")] = inp.value; atualizarValorUnitarioPreview(cont.closest("form"), novoPedidoItens); });
   });
   cont.querySelectorAll("[data-remove-item]").forEach(function(b){
     b.addEventListener("click", function(){ novoPedidoItens.splice(Number(b.getAttribute("data-remove-item")),1); renderItensRows(); });
   });
+  atualizarValorUnitarioPreview(cont.closest("form"), novoPedidoItens);
 }
 function readFileAsDataUrl(file){
   return new Promise(function(resolve,reject){
@@ -943,11 +968,13 @@ function submitPedido(form){
     erro.style.display = "block"; return;
   }
   var btn = $("#btn-enviar-pedido");
-  btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Enviando…';
+  btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Criando…';
+  var pdfWin = window.open("", "_blank"); // aberto já aqui (clique do usuário) para não ser bloqueado como pop-up
 
   var uploadPromise = arteFile ? readFileAsDataUrl(arteFile) : Promise.resolve(null);
   uploadPromise.then(function(dataUrl){
     var numero = orderNumero();
+    var valorPedidoNum = Number(fd.get("valorPedido")) || 0;
     var pedido = {
       numero: numero,
       criadoEm: new Date().toISOString(),
@@ -966,31 +993,30 @@ function submitPedido(form){
       itens: itensValidos.map(function(it){
         return {categoria:it.categoria, cor:it.cor||"", tamanho:it.tamanho||"", quantidade:Number(it.quantidade), unidade:it.unidade||"un", frente:it.frente||"", verso:it.verso||""};
       }),
+      valorPedido: valorPedidoNum,
+      valorUnitario: calcularValorUnitario(valorPedidoNum, itensValidos),
       temArte: !!dataUrl, arteNome: arteFile ? arteFile.name : null,
-      status: "enviado"
+      status: "aguardando_aprovacao"
     };
-    var baixas = pedido.itens.map(function(it){
-      var id = estoqueId(it.categoria, it.cor, it.tamanho);
-      return ajustarEstoque(id, it.categoria, it.cor, it.tamanho, it.unidade, -Math.abs(it.quantidade), true);
-    });
-    Promise.all(baixas).then(function(){
-      return setDoc(doc(db,"pedidos",numero), pedido);
-    }).then(function(){
+    setDoc(doc(db,"pedidos",numero), pedido).then(function(){
       return dataUrl ? setDoc(doc(db,"artesPedidos",numero), {dataUrl:dataUrl, nome:arteFile.name, criadoEm:new Date().toISOString()}) : null;
     }).then(function(){
-      toast("Ordem "+numero+" enviada para a produção.");
+      sincronizarClienteFromPedido(pedido.cliente);
+      toast("Ordem "+numero+" criada. Envie o PDF para o cliente aprovar antes de mandar para a produção.");
       novoPedidoItens = [{categoria:"",cor:"",tamanho:"",quantidade:"",unidade:"un",frente:"",verso:""}];
       state.view = "pedidos"; render();
+      if(pdfWin){ preencherJanelaPdfAprovacao(pdfWin, pedido); } else { toast("Permita pop-ups para ver o PDF, ou use o botão \"PDF de Aprovação\" no pedido."); }
     }).catch(function(){
       erro.textContent = "Não foi possível enviar a ordem agora. Tente novamente.";
       erro.style.display = "block";
-      btn.disabled = false; btn.textContent = "Enviar para Produção";
+      btn.disabled = false; btn.textContent = "Criar Pedido e Gerar PDF de Aprovação";
+      if(pdfWin) pdfWin.close();
     });
   });
 }
 
 // ---------- PEDIDOS (histórico) ----------
-function statusLabel(s){ return s==="enviado" ? "Enviado" : s==="recebido" ? "Recebido" : s==="concluido" ? "Concluído" : s; }
+function statusLabel(s){ return s==="aguardando_aprovacao" ? "Aguardando Aprovação" : s==="enviado" ? "Enviado" : s==="recebido" ? "Recebido" : s==="concluido" ? "Concluído" : s; }
 function abrirArte(numero){
   if(state.arteCache[numero]){ abrirBlobPdf(state.arteCache[numero]); return; }
   toast("Abrindo arte…");
@@ -1036,6 +1062,8 @@ function abrirDetalhePedido(numero){
   var podeEditarPedido = state.user && (state.user.setor==="comercial" || state.user.setor==="admin");
   var editBtn = podeEditarPedido ? '<button class="btn btn-ghost btn-sm" type="button" data-editar-pedido="'+esc(p.numero)+'">Editar</button>' : "";
   var excluirBtn = podeEditarPedido ? '<button class="btn btn-danger btn-sm" type="button" data-excluir-pedido="'+esc(p.numero)+'">Excluir</button>' : "";
+  var pdfBtn = '<button class="btn btn-ghost btn-sm" type="button" data-pdf-aprovacao="'+esc(p.numero)+'">PDF de Aprovação</button>';
+  var enviarProducaoBtn = (podeEditarPedido && p.status==="aguardando_aprovacao") ? '<button class="btn btn-success btn-sm" type="button" data-enviar-producao="'+esc(p.numero)+'">Enviar para Produção</button>' : "";
   box.innerHTML =
     '<div class="modal-head"><div><div class="order-num">'+esc(p.numero)+'</div><div class="order-meta">'+esc(p.cliente && p.cliente.nome)+'</div></div>' +
     '<span class="chip chip-'+p.status+'">'+statusLabel(p.status)+'</span>' +
@@ -1053,6 +1081,8 @@ function abrirDetalhePedido(numero){
       '<div><label>Previsão de entrega</label><div>'+(p.previsaoDias!=null ? esc(p.previsaoDias)+" dia(s)" : "—")+'</div></div>' +
       '<div><label>Vendedor</label><div>'+esc(p.vendedor||"—")+'</div></div>' +
       '<div><label>Produzido por</label><div>'+esc(p.produzidoPor||"—")+'</div></div>' +
+      '<div><label>Valor do pedido</label><div>'+(p.valorPedido?fmtMoeda(p.valorPedido):"—")+'</div></div>' +
+      '<div><label>Valor unitário</label><div>'+(p.valorUnitario?fmtMoeda(p.valorUnitario):"—")+'</div></div>' +
       '<div><label>Pigmento</label><div>'+esc(p.pigmento||"—")+'</div></div>' +
       '<div><label>Cor de impressão</label><div>'+esc(p.corImpressao||"—")+'</div></div>' +
       (p.obs ? '<div class="span2"><label>Observações</label><div>'+esc(p.obs)+'</div></div>' : "") +
@@ -1066,8 +1096,10 @@ function abrirDetalhePedido(numero){
       (p.recebidoEm ? '<span>Recebido: '+fmtDate(p.recebidoEm)+(p.recebidoPor?" ("+esc(p.recebidoPor)+")":"")+'</span>' : "") +
       (p.concluidoEm ? '<span>Concluído: '+fmtDate(p.concluidoEm)+(p.concluidoPor?" ("+esc(p.concluidoPor)+")":"")+'</span>' : "") +
     '</div>' +
-    '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;">'+arteBtn+confirmBtn+editBtn+excluirBtn+'</div>';
+    '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;">'+arteBtn+confirmBtn+pdfBtn+enviarProducaoBtn+editBtn+excluirBtn+'</div>';
   box.querySelectorAll("[data-ver-arte]").forEach(function(b){ b.addEventListener("click", function(){ abrirArte(b.getAttribute("data-ver-arte")); }); });
+  box.querySelectorAll("[data-pdf-aprovacao]").forEach(function(b){ b.addEventListener("click", function(){ abrirPdfAprovacao(b.getAttribute("data-pdf-aprovacao")); }); });
+  box.querySelectorAll("[data-enviar-producao]").forEach(function(b){ b.addEventListener("click", function(){ enviarParaProducao(b.getAttribute("data-enviar-producao")); }); });
   box.querySelectorAll("[data-confirmar]").forEach(function(b){
     b.addEventListener("click", function(){
       b.disabled = true; b.innerHTML = '<span class="spinner"></span>';
@@ -1087,6 +1119,82 @@ function fecharModalPedido(){
   modal.classList.remove("show");
   setTimeout(function(){ modal.hidden = true; }, 150);
 }
+function preencherJanelaPdfAprovacao(win, p){
+  var itensHtml = (p.itens||[]).map(function(it){
+    return '<tr><td>'+esc(it.categoria)+'</td><td>'+esc(it.cor||"—")+'</td><td>'+esc(it.tamanho||"—")+'</td>' +
+      '<td style="text-align:right;">'+fmtNum(it.quantidade)+' '+esc(it.unidade)+'</td>' +
+      '<td>'+esc(it.frente||"—")+'</td><td>'+esc(it.verso||"—")+'</td></tr>';
+  }).join("");
+  var agora = new Date();
+  var html =
+    '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><title>Resumo do Pedido '+esc(p.numero)+' - CaruFlex</title>' +
+    '<style>' +
+      'body{font-family:Arial,Helvetica,sans-serif;color:#161F27;padding:24px;}' +
+      'h1{font-size:18px;margin:0;}' +
+      '.sub{color:#5B6873;font-size:12px;margin-bottom:18px;}' +
+      'table{width:100%;border-collapse:collapse;font-size:12px;margin-top:10px;}' +
+      'th,td{padding:6px 8px;border-bottom:1px solid #D9DFDA;text-align:left;}' +
+      'th{background:#EAEEEA;text-transform:uppercase;font-size:10px;letter-spacing:.04em;}' +
+      '.grid{display:grid;grid-template-columns:1fr 1fr;gap:8px 24px;margin:14px 0;font-size:13px;}' +
+      '.grid label{display:block;font-size:10.5px;color:#5B6873;text-transform:uppercase;letter-spacing:.03em;}' +
+      '.valores{margin-top:16px;padding:12px 14px;background:#F4F6F4;border-radius:8px;display:flex;gap:32px;}' +
+      '.valores div span{display:block;font-size:11px;color:#5B6873;}' +
+      '.valores div b{font-size:16px;}' +
+      '.obs-box{margin-top:14px;font-size:12px;}' +
+      '.obs-box label{display:block;color:#5B6873;text-transform:uppercase;font-size:10.5px;margin-bottom:2px;}' +
+      '.assinatura{margin-top:56px;display:flex;gap:40px;}' +
+      '.assinatura div{flex:1;border-top:1px solid #161F27;padding-top:6px;font-size:12px;text-align:center;}' +
+      '@media print{ @page{ margin:16mm; } }' +
+    '</style></head><body>' +
+    '<div style="display:flex;align-items:center;gap:12px;margin-bottom:6px;">' +
+      '<img src="'+LOGO_ESTOQUE_PDF+'" alt="CaruFlex" style="height:44px;width:auto;display:block;">' +
+      '<h1>Resumo do Pedido para Aprovação</h1>' +
+    '</div>' +
+    '<div class="sub">Ordem '+esc(p.numero)+' · Gerado em '+agora.toLocaleDateString("pt-BR")+' às '+agora.toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"})+'</div>' +
+    '<div class="grid">' +
+      '<div><label>Cliente</label>'+esc((p.cliente&&p.cliente.nome)||"—")+'</div>' +
+      '<div><label>Telefone</label>'+esc((p.cliente&&p.cliente.telefone)||"—")+'</div>' +
+      '<div><label>Endereço</label>'+esc((p.cliente&&p.cliente.endereco)||"—")+'</div>' +
+      '<div><label>Marca</label>'+esc(p.marca||"—")+'</div>' +
+      '<div><label>Tipo de pedido</label>'+esc(tipoPedidoLabel(p.tipoPedido))+'</div>' +
+      '<div><label>Previsão de entrega</label>'+(p.previsaoDias!=null?esc(p.previsaoDias)+" dia(s)":"—")+'</div>' +
+    '</div>' +
+    '<table><thead><tr><th>Item</th><th>Cor</th><th>Tamanho</th><th style="text-align:right;">Quantidade</th><th>Impressão frente</th><th>Impressão verso</th></tr></thead><tbody>'+itensHtml+'</tbody></table>' +
+    '<div class="valores">' +
+      '<div><span>Valor do pedido</span><b>'+fmtMoeda(p.valorPedido)+'</b></div>' +
+      '<div><span>Valor unitário</span><b>'+fmtMoeda(p.valorUnitario)+'</b></div>' +
+    '</div>' +
+    (p.obs ? '<div class="obs-box"><label>Observações</label>'+esc(p.obs)+'</div>' : "") +
+    '<div class="assinatura">' +
+      '<div>Assinatura do cliente</div>' +
+      '<div>Data</div>' +
+    '</div>' +
+    '</body></html>';
+  win.document.open(); win.document.write(html); win.document.close();
+  setTimeout(function(){ try{ win.focus(); win.print(); }catch(e){} }, 300);
+}
+function abrirPdfAprovacao(numero){
+  var p = state.cache.pedidos.filter(function(x){ return x.numero===numero; })[0];
+  if(!p){ toast("Pedido não encontrado."); return; }
+  var win = window.open("", "_blank");
+  if(!win){ toast("Permita pop-ups para gerar o PDF."); return; }
+  preencherJanelaPdfAprovacao(win, p);
+}
+function enviarParaProducao(numero){
+  var p = state.cache.pedidos.filter(function(x){ return x.numero===numero; })[0];
+  if(!p) return;
+  if(!window.confirm("Confirma que o cliente aprovou a ordem "+numero+"? O estoque das sacolas será baixado agora e a ordem seguirá para a produção.")) return;
+  var baixas = (p.itens||[]).map(function(it){
+    var id = estoqueId(it.categoria, it.cor, it.tamanho);
+    return ajustarEstoque(id, it.categoria, it.cor, it.tamanho, it.unidade, -Math.abs(Number(it.quantidade)||0), true);
+  });
+  Promise.all(baixas).then(function(){
+    return updateDoc(doc(db,"pedidos",numero), {status:"enviado", enviadoProducaoEm:new Date().toISOString(), enviadoProducaoPor: state.user.nome||state.user.login});
+  }).then(function(){
+    toast("Ordem "+numero+" enviada para a produção.");
+    fecharModalPedido();
+  }).catch(function(){ toast("Não foi possível enviar para a produção agora. Tente novamente."); });
+}
 function renderPedidoCard(p){
   var card = el("div", {class:"order-card st-"+p.status, "data-abrir-op": p.numero});
   var itensHtml = (p.itens||[]).map(function(it){
@@ -1103,23 +1211,25 @@ function renderPedidoCard(p){
   var podeEditarPedidoCard = state.user && (state.user.setor==="comercial" || state.user.setor==="admin");
   var editBtnCard = podeEditarPedidoCard ? '<button class="btn btn-ghost btn-sm" type="button" data-editar-pedido="'+esc(p.numero)+'">Editar</button>' : "";
   var excluirBtnCard = podeEditarPedidoCard ? '<button class="btn btn-danger btn-sm" type="button" data-excluir-pedido="'+esc(p.numero)+'">Excluir</button>' : "";
+  var pdfBtnCard = '<button class="btn btn-ghost btn-sm" type="button" data-pdf-aprovacao="'+esc(p.numero)+'">PDF de Aprovação</button>';
+  var enviarProducaoBtnCard = (podeEditarPedidoCard && p.status==="aguardando_aprovacao") ? '<button class="btn btn-success btn-sm" type="button" data-enviar-producao="'+esc(p.numero)+'">Enviar para Produção</button>' : "";
   card.innerHTML =
     '<div class="order-head"><div><div class="order-num">'+esc(p.numero)+' · '+esc(p.cliente && p.cliente.nome)+'</div>' +
-    '<div class="order-meta">'+esc(p.marca||"—")+' · Vendedor: '+esc(p.vendedor||"—")+'</div></div>' +
+    '<div class="order-meta">'+esc(p.marca||"—")+' · Vendedor: '+esc(p.vendedor||"—")+(p.valorPedido?' · '+fmtMoeda(p.valorPedido):'')+'</div></div>' +
     '<span class="chip chip-'+p.status+'">'+statusLabel(p.status)+'</span></div>' +
     '<div class="order-items">'+itensHtml+'</div>' +
     '<div class="order-foot"><div class="timeline">' +
       '<span>Criado: '+fmtDate(p.criadoEm)+'</span>' +
       (p.recebidoEm ? '<span>Recebido: '+fmtDate(p.recebidoEm)+'</span>' : "") +
       (p.concluidoEm ? '<span>Concluído: '+fmtDate(p.concluidoEm)+'</span>' : "") +
-    '</div><div style="display:flex;gap:8px;flex-wrap:wrap;">'+arteBtn+confirmBtn+editBtnCard+excluirBtnCard+'</div></div>';
+    '</div><div style="display:flex;gap:8px;flex-wrap:wrap;">'+arteBtn+confirmBtn+pdfBtnCard+enviarProducaoBtnCard+editBtnCard+excluirBtnCard+'</div></div>';
   return card;
 }
 function renderPedidos(){
   var box = el("div");
   box.appendChild(el("div", {}, '<div class="section-title">Pedidos</div><div class="section-sub">Histórico e acompanhamento de todas as ordens de produção.</div>'));
   var filters = el("div", {class:"filter-row"});
-  [["todos","Todos"],["enviado","Enviados"],["recebido","Recebidos"],["concluido","Concluídos"]].forEach(function(f){
+  [["todos","Todos"],["aguardando_aprovacao","Aguardando Aprovação"],["enviado","Enviados"],["recebido","Recebidos"],["concluido","Concluídos"]].forEach(function(f){
     var n = f[0]==="todos" ? 0 : countByStatus(f[0]);
     filters.appendChild(el("button", {"data-filtro":f[0], type:"button", class: state.filtroPedidos===f[0]?"active":""}, esc(f[1]) + (n ? ' <span class="count">'+n+'</span>' : "")));
   });
@@ -1185,6 +1295,10 @@ function abrirEditarPedido(numero){
       '</div>' +
       '<datalist id="dl-producao-edit">' + state.cache.usuarios.filter(function(u){return u.setor==="producao";}).map(function(u){return '<option value="'+esc(u.nome||u.login)+'">';}).join("") + '</datalist>' +
       '<div class="field"><label>Observações</label><textarea name="obs" rows="2">'+esc(p.obs)+'</textarea></div>' +
+      '<div class="row">' +
+        '<div class="field"><label>Valor do pedido (R$)</label><input name="valorPedido" type="number" step="0.01" min="0" value="'+(p.valorPedido||"")+'"></div>' +
+        '<div class="field"><label>Valor unitário (R$)</label><input name="valorUnitarioPreview" readonly></div>' +
+      '</div>' +
       '<hr class="divider">' +
       '<label style="margin-bottom:10px;display:block;">Itens do pedido</label>' +
       '<div class="stack" id="edit-itens-container"></div>' +
@@ -1208,6 +1322,8 @@ function abrirEditarPedido(numero){
     if(cli) preencherClienteNoForm($("#form-editar-pedido", box), cli);
   });
   wireToggleIE(box, "clienteCpfCnpj", "wrap-ie-pedido-edit");
+  var campoValorPedidoEdit = box.querySelector('[name="valorPedido"]');
+  if(campoValorPedidoEdit) campoValorPedidoEdit.addEventListener("input", function(){ atualizarValorUnitarioPreview($("#form-editar-pedido", box), editPedidoItens); });
   $("#modal-op-fechar", box).addEventListener("click", fecharModalPedido);
   $("#btn-cancelar-edicao", box).addEventListener("click", fecharModalPedido);
   $("#btn-add-item-edit", box).addEventListener("click", function(){ editPedidoItens.push({categoria:"",cor:"",tamanho:"",quantidade:"",unidade:"un",frente:"",verso:""}); renderEditItensRows(); });
@@ -1244,11 +1360,12 @@ function renderEditItensRows(){
     cont.appendChild(row);
   });
   cont.querySelectorAll("[data-eit]").forEach(function(inp){
-    inp.addEventListener("input", function(){ editPedidoItens[Number(inp.getAttribute("data-eidx"))][inp.getAttribute("data-eit")] = inp.value; });
+    inp.addEventListener("input", function(){ editPedidoItens[Number(inp.getAttribute("data-eidx"))][inp.getAttribute("data-eit")] = inp.value; atualizarValorUnitarioPreview(cont.closest("form"), editPedidoItens); });
   });
   cont.querySelectorAll("[data-remove-eitem]").forEach(function(b){
     b.addEventListener("click", function(){ editPedidoItens.splice(Number(b.getAttribute("data-remove-eitem")),1); renderEditItensRows(); });
   });
+  atualizarValorUnitarioPreview(cont.closest("form"), editPedidoItens);
 }
 function salvarEdicaoPedido(box){
   var erro = $("#editar-pedido-erro", box);
@@ -1279,20 +1396,25 @@ function salvarEdicaoPedido(box){
     corImpressao: (fd.get("corImpressao")||"").toString(),
     obs: (fd.get("obs")||"").toString(),
     itens: itensFinais,
+    valorPedido: Number(fd.get("valorPedido")) || 0,
+    valorUnitario: calcularValorUnitario(Number(fd.get("valorPedido")) || 0, itensFinais),
     editadoEm: new Date().toISOString(),
     editadoPor: state.user.nome || state.user.login
   };
+  var estoqueJaBaixadoOriginal = pOriginal && pOriginal.status !== "aguardando_aprovacao";
   var mapa = {};
-  itensOriginais.forEach(function(it){
-    var id = estoqueId(it.categoria,it.cor,it.tamanho);
-    if(!mapa[id]) mapa[id] = {categoria:it.categoria, cor:it.cor, tamanho:it.tamanho, unidade:it.unidade, antes:0, depois:0};
-    mapa[id].antes += Number(it.quantidade)||0;
-  });
-  itensFinais.forEach(function(it){
-    var id = estoqueId(it.categoria,it.cor,it.tamanho);
-    if(!mapa[id]) mapa[id] = {categoria:it.categoria, cor:it.cor, tamanho:it.tamanho, unidade:it.unidade, antes:0, depois:0};
-    mapa[id].depois += Number(it.quantidade)||0;
-  });
+  if(estoqueJaBaixadoOriginal){
+    itensOriginais.forEach(function(it){
+      var id = estoqueId(it.categoria,it.cor,it.tamanho);
+      if(!mapa[id]) mapa[id] = {categoria:it.categoria, cor:it.cor, tamanho:it.tamanho, unidade:it.unidade, antes:0, depois:0};
+      mapa[id].antes += Number(it.quantidade)||0;
+    });
+    itensFinais.forEach(function(it){
+      var id = estoqueId(it.categoria,it.cor,it.tamanho);
+      if(!mapa[id]) mapa[id] = {categoria:it.categoria, cor:it.cor, tamanho:it.tamanho, unidade:it.unidade, antes:0, depois:0};
+      mapa[id].depois += Number(it.quantidade)||0;
+    });
+  }
   var ajustes = Object.keys(mapa).map(function(id){
     var m = mapa[id];
     var delta = m.antes - m.depois;
@@ -1314,8 +1436,10 @@ function salvarEdicaoPedido(box){
 function excluirPedido(numero){
   var p = state.cache.pedidos.filter(function(x){ return x.numero===numero; })[0];
   if(!p) return;
-  if(!window.confirm("Excluir a ordem "+numero+"? As sacolas usadas serão devolvidas ao estoque. Essa ação não pode ser desfeita.")) return;
-  var devolucoes = (p.itens||[]).map(function(it){
+  var estoqueJaBaixado = p.status !== "aguardando_aprovacao";
+  var msgConfirma = "Excluir a ordem "+numero+"? " + (estoqueJaBaixado ? "As sacolas usadas serão devolvidas ao estoque. " : "") + "Essa ação não pode ser desfeita.";
+  if(!window.confirm(msgConfirma)) return;
+  var devolucoes = !estoqueJaBaixado ? [] : (p.itens||[]).map(function(it){
     var id = estoqueId(it.categoria,it.cor,it.tamanho);
     return ajustarEstoque(id, it.categoria, it.cor, it.tamanho, it.unidade, Math.abs(Number(it.quantidade)||0), true);
   });
@@ -1377,6 +1501,8 @@ function wireViewEvents(root){
   if(btnAddItem) btnAddItem.addEventListener("click", function(){ novoPedidoItens.push({categoria:"",cor:"",tamanho:"",quantidade:"",unidade:"un",frente:"",verso:""}); renderItensRows(); });
   var formPedido = $("#form-pedido", root);
   if(formPedido) formPedido.addEventListener("submit", function(e){ e.preventDefault(); submitPedido(formPedido); });
+  var campoValorPedido = root.querySelector('[name="valorPedido"]');
+  if(campoValorPedido) campoValorPedido.addEventListener("input", function(){ atualizarValorUnitarioPreview(formPedido, novoPedidoItens); });
   var campoDocPedido = root.querySelector('[name="clienteCpfCnpj"]');
   if(campoDocPedido) campoDocPedido.addEventListener("change", function(){
     var cli = buscarClientePorDocumento(campoDocPedido.value);
@@ -1401,6 +1527,8 @@ function wireViewEvents(root){
   });
   root.querySelectorAll("[data-editar-pedido]").forEach(function(b){ b.addEventListener("click", function(){ abrirEditarPedido(b.getAttribute("data-editar-pedido")); }); });
   root.querySelectorAll("[data-excluir-pedido]").forEach(function(b){ b.addEventListener("click", function(){ excluirPedido(b.getAttribute("data-excluir-pedido")); }); });
+  root.querySelectorAll("[data-pdf-aprovacao]").forEach(function(b){ b.addEventListener("click", function(){ abrirPdfAprovacao(b.getAttribute("data-pdf-aprovacao")); }); });
+  root.querySelectorAll("[data-enviar-producao]").forEach(function(b){ b.addEventListener("click", function(){ enviarParaProducao(b.getAttribute("data-enviar-producao")); }); });
   root.querySelectorAll("[data-editar-estoque]").forEach(function(b){ b.addEventListener("click", function(){ abrirEditarEstoque(b.getAttribute("data-editar-estoque")); }); });
   root.querySelectorAll("[data-excluir-estoque]").forEach(function(b){ b.addEventListener("click", function(){ excluirEstoque(b.getAttribute("data-excluir-estoque")); }); });
   root.querySelectorAll("[data-editar-cliente]").forEach(function(b){ b.addEventListener("click", function(){ abrirEditarCliente(b.getAttribute("data-editar-cliente")); }); });
@@ -1439,9 +1567,10 @@ function wireViewEvents(root){
     var cor = (fd.get("cor")||"").toString().trim();
     var tamanho = (fd.get("tamanho")||"").toString().trim();
     var unidade = fd.get("unidade");
-    var quantidade = Number(fd.get("quantidade"))||0;
+    var quantidadeRaw = fd.get("quantidade");
+    var quantidade = Number(quantidadeRaw);
     var minimo = Number(fd.get("minimo"))||0;
-    if(!categoria || !quantidade){ toast("Informe categoria e quantidade."); return; }
+    if(!categoria || quantidadeRaw===null || quantidadeRaw.toString().trim()==="" || isNaN(quantidade)){ toast("Informe categoria e quantidade."); return; }
     var id = estoqueId(categoria,cor,tamanho);
     var ref = doc(db,"estoque",id);
     getDoc(ref).then(function(snap){
