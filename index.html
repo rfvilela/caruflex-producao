@@ -220,7 +220,7 @@ var state = {
   view: "login",
   filtroPedidos: "todos",
   bootstrapNecessario: null,
-  cache: { estoque: [], pedidos: [], usuarios: [] },
+  cache: { estoque: [], pedidos: [], usuarios: [], clientes: [] },
   arteCache: {},
   loading: true,
   loginError: "", bootstrapError: ""
@@ -329,6 +329,11 @@ function subscribeAll(){
     qs.forEach(function(d){ arr.push(Object.assign({uid:d.id}, d.data())); });
     state.cache.usuarios = arr; render();
   }));
+  unsubList.push(onSnapshot(collection(db,"clientes"), function(qs){
+    var arr = [];
+    qs.forEach(function(d){ arr.push(Object.assign({id:d.id}, d.data())); });
+    state.cache.clientes = arr; render();
+  }));
 }
 
 // ---------- auth ----------
@@ -436,6 +441,7 @@ function renderLogin(){
 function tabsFor(setor){
   var tabs = [];
   if(setor==="comercial"||setor==="admin") tabs.push({id:"novoPedido", label:"Novo Pedido"});
+  if(setor==="comercial"||setor==="admin") tabs.push({id:"clientes", label:"Clientes"});
   tabs.push({id:"pedidos", label:"Pedidos", count: (setor==="producao"||setor==="admin") ? (countByStatus("enviado")+countByStatus("recebido")) : 0});
   tabs.push({id:"estoque", label:"Estoque"});
   if(setor==="admin") tabs.push({id:"admin", label:"Admin"});
@@ -463,6 +469,7 @@ function renderShell(){
   var content;
   switch(state.view){
     case "novoPedido": content = renderNovoPedido(); break;
+    case "clientes": content = renderClientes(); break;
     case "pedidos": content = renderPedidos(); break;
     case "estoque": content = renderEstoque(); break;
     case "admin": content = renderAdmin(); break;
@@ -538,10 +545,14 @@ function datalists(){
   var cats = Array.from(new Set(state.cache.estoque.map(function(i){return i.categoria;}).concat(CATEGORIAS_PADRAO).filter(Boolean)));
   var cores = Array.from(new Set(state.cache.estoque.map(function(i){return i.cor;}).filter(Boolean)));
   var tam = Array.from(new Set(state.cache.estoque.map(function(i){return i.tamanho;}).filter(Boolean)));
+  var docsClientes = Array.from(new Set(state.cache.clientes.map(function(c){return c.cpfCnpj;}).filter(Boolean)));
+  var nomesClientes = Array.from(new Set(state.cache.clientes.map(function(c){return c.nome;}).filter(Boolean)));
   function opts(arr){ return arr.map(function(v){return '<option value="'+esc(v)+'">';}).join(""); }
   return '<datalist id="dl-categorias">'+opts(cats)+'</datalist>' +
          '<datalist id="dl-cores">'+opts(cores)+'</datalist>' +
-         '<datalist id="dl-tamanhos">'+opts(tam)+'</datalist>';
+         '<datalist id="dl-tamanhos">'+opts(tam)+'</datalist>' +
+         '<datalist id="dl-clientes-doc">'+opts(docsClientes)+'</datalist>' +
+         '<datalist id="dl-clientes-nome">'+opts(nomesClientes)+'</datalist>';
 }
 function abrirEditarEstoque(id){
   var it = state.cache.estoque.filter(function(x){ return x.id===id; })[0];
@@ -658,6 +669,174 @@ function exportarEstoquePdf(){
   setTimeout(function(){ win.focus(); win.print(); }, 300);
 }
 
+// ---------- CLIENTES ----------
+function normalizarDocumento(s){ return (s||"").toString().replace(/[^0-9]/g,""); }
+function ehCnpj(valor){ return normalizarDocumento(valor).length===14; }
+function wireToggleIE(scope, nomeCampoDoc, idWrap){
+  var campoDoc = scope.querySelector('[name="'+nomeCampoDoc+'"]');
+  var wrap = scope.querySelector("#"+idWrap);
+  if(!campoDoc || !wrap) return;
+  function atualizar(){ wrap.style.display = ehCnpj(campoDoc.value) ? "block" : "none"; }
+  campoDoc.addEventListener("input", atualizar);
+  atualizar();
+}
+function clienteId(cpfCnpj, nome, idExistente){
+  var docNum = normalizarDocumento(cpfCnpj);
+  if(docNum) return docNum;
+  if(idExistente) return idExistente;
+  return "c-" + slugify(nome) + "-" + Date.now();
+}
+function buscarClientePorDocumento(valor){
+  var alvo = normalizarDocumento(valor);
+  if(!alvo) return null;
+  return state.cache.clientes.filter(function(c){ return normalizarDocumento(c.cpfCnpj)===alvo; })[0] || null;
+}
+function buscarClientePorNome(nome){
+  var alvo = (nome||"").toString().trim().toLowerCase();
+  if(!alvo) return null;
+  return state.cache.clientes.filter(function(c){ return (c.nome||"").toString().trim().toLowerCase()===alvo; })[0] || null;
+}
+function preencherClienteNoForm(form, cliente){
+  if(!form || !cliente) return;
+  var mapa = {clienteCpfCnpj:"cpfCnpj", clienteNome:"nome", clienteTelefone:"telefone", clienteEndereco:"endereco", clienteEmail:"email", clienteInscricaoEstadual:"inscricaoEstadual"};
+  Object.keys(mapa).forEach(function(campo){
+    var input = form.querySelector('[name="'+campo+'"]');
+    if(input) input.value = cliente[mapa[campo]] || "";
+  });
+  toast("Dados do cliente preenchidos automaticamente.");
+}
+function sincronizarClienteFromPedido(cliente){
+  if(!cliente || !(cliente.nome||"").toString().trim()) return;
+  var existente = cliente.cpfCnpj ? buscarClientePorDocumento(cliente.cpfCnpj) : null;
+  if(!existente) existente = buscarClientePorNome(cliente.nome);
+  var id = clienteId(cliente.cpfCnpj, cliente.nome, existente && existente.id);
+  var dados = {
+    nome: cliente.nome,
+    cpfCnpj: cliente.cpfCnpj || (existente && existente.cpfCnpj) || "",
+    inscricaoEstadual: cliente.inscricaoEstadual || (existente && existente.inscricaoEstadual) || "",
+    telefone: cliente.telefone || (existente && existente.telefone) || "",
+    endereco: cliente.endereco || (existente && existente.endereco) || "",
+    email: cliente.email || (existente && existente.email) || "",
+    atualizadoEm: new Date().toISOString()
+  };
+  if(!existente) dados.criadoEm = new Date().toISOString();
+  setDoc(doc(db,"clientes",id), dados, {merge:true}).catch(function(){});
+}
+function renderClientes(){
+  var box = el("div", {class:"stack"});
+  box.appendChild(el("div", {}, '<div class="section-title">Clientes</div><div class="section-sub">Cadastro de clientes para preencher os dados automaticamente ao criar um pedido.</div>'));
+  var addCard = el("div", {class:"card"});
+  addCard.innerHTML =
+    '<div class="section-title" style="font-size:15px;margin-bottom:10px;">Novo cliente</div>' +
+    '<form id="form-cliente-add">' +
+      '<div class="row">' +
+        '<div class="field"><label>CPF ou CNPJ</label><input name="cpfCnpj" placeholder="Somente números"></div>' +
+        '<div class="field"><label>Nome *</label><input name="nome" required></div>' +
+      '</div>' +
+      '<div class="field" id="wrap-ie-add" style="display:none"><label>Inscrição Estadual</label><input name="inscricaoEstadual" placeholder="Quando for pessoa jurídica"></div>' +
+      '<div class="row">' +
+        '<div class="field"><label>Telefone</label><input name="telefone" placeholder="(00) 00000-0000"></div>' +
+        '<div class="field"><label>E-mail</label><input name="email" type="email"></div>' +
+      '</div>' +
+      '<div class="field"><label>Endereço</label><input name="endereco" placeholder="Endereço completo"></div>' +
+      '<div id="cliente-erro" class="error-msg" style="display:none;"></div>' +
+      '<button class="btn btn-primary" type="submit">Salvar cliente</button>' +
+    '</form>';
+  box.appendChild(addCard);
+  setTimeout(function(){ wireToggleIE(addCard, "cpfCnpj", "wrap-ie-add"); }, 0);
+  var lista = state.cache.clientes.slice().sort(function(a,b){ return (a.nome||"").localeCompare(b.nome||""); });
+  if(lista.length===0){
+    box.appendChild(el("div",{class:"card empty-state"}, '<div class="glyph">🗒️</div>Nenhum cliente cadastrado ainda.'));
+    return box;
+  }
+  var tableCard = el("div", {class:"card"});
+  var html = '<table class="stock-table"><thead><tr><th>Nome</th><th>CPF/CNPJ</th><th>Inscrição Estadual</th><th>Telefone</th><th>E-mail</th><th></th></tr></thead><tbody>';
+  lista.forEach(function(c){
+    html += '<tr><td>'+esc(c.nome||"—")+'</td><td>'+esc(c.cpfCnpj||"—")+'</td><td>'+esc(c.inscricaoEstadual||"—")+'</td><td>'+esc(c.telefone||"—")+'</td><td>'+esc(c.email||"—")+'</td>' +
+      '<td><div style="display:flex;gap:6px;flex-wrap:wrap;">' +
+        '<button class="btn btn-ghost btn-sm" data-editar-cliente="'+esc(c.id)+'" type="button">Editar</button>' +
+        '<button class="btn btn-danger btn-sm" data-excluir-cliente="'+esc(c.id)+'" type="button">Excluir</button>' +
+      '</div></td></tr>';
+  });
+  html += "</tbody></table>";
+  tableCard.innerHTML = html;
+  box.appendChild(tableCard);
+  return box;
+}
+function abrirEditarCliente(id){
+  var c = state.cache.clientes.filter(function(x){ return x.id===id; })[0];
+  if(!c){ toast("Cliente não encontrado."); return; }
+  var modal = $("#modal-op");
+  var box = $(".modal-box", modal);
+  box.innerHTML =
+    '<div class="modal-head"><div><div class="order-num">Editar cliente</div></div>' +
+    '<button class="modal-close" type="button" id="modal-op-fechar" aria-label="Fechar">&times;</button></div>' +
+    '<form id="form-editar-cliente">' +
+      '<div class="row">' +
+        '<div class="field"><label>CPF ou CNPJ</label><input name="cpfCnpj" value="'+esc(c.cpfCnpj)+'"></div>' +
+        '<div class="field"><label>Nome *</label><input name="nome" required value="'+esc(c.nome)+'"></div>' +
+      '</div>' +
+      '<div class="field" id="wrap-ie-editcliente" style="display:none"><label>Inscrição Estadual</label><input name="inscricaoEstadual" value="'+esc(c.inscricaoEstadual)+'"></div>' +
+      '<div class="row">' +
+        '<div class="field"><label>Telefone</label><input name="telefone" value="'+esc(c.telefone)+'"></div>' +
+        '<div class="field"><label>E-mail</label><input name="email" type="email" value="'+esc(c.email)+'"></div>' +
+      '</div>' +
+      '<div class="field"><label>Endereço</label><input name="endereco" value="'+esc(c.endereco)+'"></div>' +
+      '<div id="editar-cliente-erro" class="error-msg" style="display:none;"></div>' +
+      '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px;">' +
+        '<button class="btn btn-primary" type="submit">Salvar alterações</button>' +
+        '<button class="btn btn-ghost" type="button" id="btn-cancelar-edicao-cliente">Cancelar</button>' +
+        '<button class="btn btn-danger" type="button" id="btn-excluir-cliente-modal">Excluir cliente</button>' +
+      '</div>' +
+    '</form>';
+  wireToggleIE(box, "cpfCnpj", "wrap-ie-editcliente");
+  $("#modal-op-fechar", box).addEventListener("click", fecharModalPedido);
+  $("#btn-cancelar-edicao-cliente", box).addEventListener("click", fecharModalPedido);
+  $("#btn-excluir-cliente-modal", box).addEventListener("click", function(){ excluirCliente(id); });
+  $("#form-editar-cliente", box).addEventListener("submit", function(e){ e.preventDefault(); salvarEdicaoCliente(id, box); });
+  modal.hidden = false;
+  requestAnimationFrame(function(){ modal.classList.add("show"); });
+}
+function salvarEdicaoCliente(idAntigo, box){
+  var erro = $("#editar-cliente-erro", box);
+  erro.style.display = "none";
+  var fd = new FormData($("#form-editar-cliente", box));
+  var nome = (fd.get("nome")||"").toString().trim();
+  if(!nome){ erro.textContent = "Informe o nome."; erro.style.display = "block"; return; }
+  var cpfCnpj = (fd.get("cpfCnpj")||"").toString().trim();
+  var dados = {
+    nome: nome, cpfCnpj: cpfCnpj,
+    inscricaoEstadual: (fd.get("inscricaoEstadual")||"").toString(),
+    telefone: (fd.get("telefone")||"").toString(),
+    email: (fd.get("email")||"").toString(),
+    endereco: (fd.get("endereco")||"").toString(),
+    atualizadoEm: new Date().toISOString()
+  };
+  var idNovo = clienteId(cpfCnpj, nome, idAntigo);
+  var btn = box.querySelector('button[type="submit"]');
+  btn.disabled = true;
+  var acao;
+  if(idNovo===idAntigo){
+    acao = updateDoc(doc(db,"clientes",idAntigo), dados);
+  } else {
+    var existente = state.cache.clientes.filter(function(x){ return x.id===idNovo; })[0];
+    if(existente){
+      erro.textContent = "Já existe outro cliente com esse CPF/CNPJ.";
+      erro.style.display = "block"; btn.disabled = false; return;
+    }
+    dados.criadoEm = new Date().toISOString();
+    acao = setDoc(doc(db,"clientes",idNovo), dados).then(function(){ return deleteDoc(doc(db,"clientes",idAntigo)); });
+  }
+  acao.then(function(){ toast("Cliente atualizado."); fecharModalPedido(); })
+    .catch(function(){ erro.textContent = "Não foi possível salvar agora. Tente novamente."; erro.style.display = "block"; btn.disabled = false; });
+}
+function excluirCliente(id){
+  var c = state.cache.clientes.filter(function(x){ return x.id===id; })[0];
+  if(!c) return;
+  if(!window.confirm('Excluir o cliente "'+c.nome+'"? Essa ação não pode ser desfeita.')) return;
+  deleteDoc(doc(db,"clientes",id)).then(function(){ toast("Cliente excluído."); fecharModalPedido(); })
+    .catch(function(){ toast("Não foi possível excluir agora. Tente novamente."); });
+}
 // ---------- NOVO PEDIDO ----------
 var novoPedidoItens = [{categoria:"",cor:"",tamanho:"",quantidade:"",unidade:"un",frente:"",verso:""}];
 function renderNovoPedido(){
@@ -667,8 +846,13 @@ function renderNovoPedido(){
     '<div class="section-sub">Ao enviar, o estoque das sacolas usadas é baixado automaticamente e a ordem segue para a produção.</div>' +
     '<div class="card"><form id="form-pedido">' +
       '<div class="row">' +
-        '<div class="field"><label>Nome do cliente *</label><input name="clienteNome" required></div>' +
+        '<div class="field"><label>CPF ou CNPJ</label><input name="clienteCpfCnpj" list="dl-clientes-doc" placeholder="Preenche os dados se já cadastrado"></div>' +
+        '<div class="field"><label>Nome do cliente *</label><input name="clienteNome" list="dl-clientes-nome" required></div>' +
+      '</div>' +
+      '<div class="field" id="wrap-ie-pedido" style="display:none"><label>Inscrição Estadual</label><input name="clienteInscricaoEstadual" placeholder="Quando for pessoa jurídica"></div>' +
+      '<div class="row">' +
         '<div class="field"><label>Telefone</label><input name="clienteTelefone" placeholder="(00) 00000-0000"></div>' +
+        '<div class="field"><label>E-mail</label><input name="clienteEmail" type="email"></div>' +
       '</div>' +
       '<div class="field"><label>Endereço de entrega</label><input name="clienteEndereco" placeholder="Endereço completo"></div>' +
       '<div class="row">' +
@@ -768,7 +952,7 @@ function submitPedido(form){
       numero: numero,
       criadoEm: new Date().toISOString(),
       criadoPor: state.user.nome || state.user.login,
-      cliente: { nome: clienteNome, telefone: (fd.get("clienteTelefone")||"").toString(), endereco: (fd.get("clienteEndereco")||"").toString() },
+      cliente: { nome: clienteNome, telefone: (fd.get("clienteTelefone")||"").toString(), endereco: (fd.get("clienteEndereco")||"").toString(), cpfCnpj: (fd.get("clienteCpfCnpj")||"").toString(), email: (fd.get("clienteEmail")||"").toString(), inscricaoEstadual: (fd.get("clienteInscricaoEstadual")||"").toString() },
       marca: (fd.get("marca")||"").toString(),
       tipoPedido: fd.get("tipoPedido"),
       alteracaoDescricao: (fd.get("alteracaoDescricao")||"").toString(),
@@ -858,7 +1042,10 @@ function abrirDetalhePedido(numero){
     '<button class="modal-close" type="button" id="modal-op-fechar" aria-label="Fechar">&times;</button></div>' +
     '<div class="detalhe-grid">' +
       '<div><label>Cliente</label><div>'+esc((p.cliente && p.cliente.nome) || "—")+'</div></div>' +
+      '<div><label>CPF/CNPJ</label><div>'+esc((p.cliente && p.cliente.cpfCnpj) || "—")+'</div></div>' +
       '<div><label>Telefone</label><div>'+esc((p.cliente && p.cliente.telefone) || "—")+'</div></div>' +
+      '<div><label>E-mail</label><div>'+esc((p.cliente && p.cliente.email) || "—")+'</div></div>' +
+      ((p.cliente && p.cliente.inscricaoEstadual) ? '<div><label>Inscrição Estadual</label><div>'+esc(p.cliente.inscricaoEstadual)+'</div></div>' : "") +
       '<div class="span2"><label>Endereço</label><div>'+esc((p.cliente && p.cliente.endereco) || "—")+'</div></div>' +
       '<div><label>Marca</label><div>'+esc(p.marca||"—")+'</div></div>' +
       '<div><label>Tipo de pedido</label><div>'+esc(tipoPedidoLabel(p.tipoPedido))+'</div></div>' +
@@ -971,8 +1158,13 @@ function abrirEditarPedido(numero){
     '<button class="modal-close" type="button" id="modal-op-fechar" aria-label="Fechar">&times;</button></div>' +
     '<form id="form-editar-pedido">' +
       '<div class="row">' +
-        '<div class="field"><label>Nome do cliente *</label><input name="clienteNome" required value="'+esc(p.cliente && p.cliente.nome)+'"></div>' +
+        '<div class="field"><label>CPF ou CNPJ</label><input name="clienteCpfCnpj" list="dl-clientes-doc" value="'+esc(p.cliente && p.cliente.cpfCnpj)+'"></div>' +
+        '<div class="field"><label>Nome do cliente *</label><input name="clienteNome" list="dl-clientes-nome" required value="'+esc(p.cliente && p.cliente.nome)+'"></div>' +
+      '</div>' +
+      '<div class="field" id="wrap-ie-pedido-edit" style="display:none"><label>Inscrição Estadual</label><input name="clienteInscricaoEstadual" value="'+esc(p.cliente && p.cliente.inscricaoEstadual)+'"></div>' +
+      '<div class="row">' +
         '<div class="field"><label>Telefone</label><input name="clienteTelefone" value="'+esc(p.cliente && p.cliente.telefone)+'"></div>' +
+        '<div class="field"><label>E-mail</label><input name="clienteEmail" type="email" value="'+esc(p.cliente && p.cliente.email)+'"></div>' +
       '</div>' +
       '<div class="field"><label>Endereço de entrega</label><input name="clienteEndereco" value="'+esc(p.cliente && p.cliente.endereco)+'"></div>' +
       '<div class="row">' +
@@ -1005,6 +1197,17 @@ function abrirEditarPedido(numero){
       '</div>' +
     '</form>' + datalists();
   renderEditItensRows();
+  var campoDocEdit = box.querySelector('[name="clienteCpfCnpj"]');
+  if(campoDocEdit) campoDocEdit.addEventListener("change", function(){
+    var cli = buscarClientePorDocumento(campoDocEdit.value);
+    if(cli) preencherClienteNoForm($("#form-editar-pedido", box), cli);
+  });
+  var campoNomeEdit = box.querySelector('[name="clienteNome"]');
+  if(campoNomeEdit) campoNomeEdit.addEventListener("change", function(){
+    var cli = buscarClientePorNome(campoNomeEdit.value);
+    if(cli) preencherClienteNoForm($("#form-editar-pedido", box), cli);
+  });
+  wireToggleIE(box, "clienteCpfCnpj", "wrap-ie-pedido-edit");
   $("#modal-op-fechar", box).addEventListener("click", fecharModalPedido);
   $("#btn-cancelar-edicao", box).addEventListener("click", fecharModalPedido);
   $("#btn-add-item-edit", box).addEventListener("click", function(){ editPedidoItens.push({categoria:"",cor:"",tamanho:"",quantidade:"",unidade:"un",frente:"",verso:""}); renderEditItensRows(); });
@@ -1065,7 +1268,7 @@ function salvarEdicaoPedido(box){
     return {categoria:it.categoria, cor:it.cor||"", tamanho:it.tamanho||"", quantidade:Number(it.quantidade), unidade:it.unidade||"un", frente:it.frente||"", verso:it.verso||""};
   });
   var patch = {
-    cliente: { nome: clienteNome, telefone: (fd.get("clienteTelefone")||"").toString(), endereco: (fd.get("clienteEndereco")||"").toString() },
+    cliente: { nome: clienteNome, telefone: (fd.get("clienteTelefone")||"").toString(), endereco: (fd.get("clienteEndereco")||"").toString(), cpfCnpj: (fd.get("clienteCpfCnpj")||"").toString(), email: (fd.get("clienteEmail")||"").toString(), inscricaoEstadual: (fd.get("clienteInscricaoEstadual")||"").toString() },
     marca: (fd.get("marca")||"").toString(),
     tipoPedido: fd.get("tipoPedido"),
     alteracaoDescricao: (fd.get("alteracaoDescricao")||"").toString(),
@@ -1099,6 +1302,7 @@ function salvarEdicaoPedido(box){
   Promise.all(ajustes).then(function(){
     return updateDoc(doc(db,"pedidos",numero), patch);
   }).then(function(){
+    sincronizarClienteFromPedido(patch.cliente);
     toast("Ordem "+numero+" atualizada.");
     fecharModalPedido();
   }).catch(function(){
@@ -1173,6 +1377,17 @@ function wireViewEvents(root){
   if(btnAddItem) btnAddItem.addEventListener("click", function(){ novoPedidoItens.push({categoria:"",cor:"",tamanho:"",quantidade:"",unidade:"un",frente:"",verso:""}); renderItensRows(); });
   var formPedido = $("#form-pedido", root);
   if(formPedido) formPedido.addEventListener("submit", function(e){ e.preventDefault(); submitPedido(formPedido); });
+  var campoDocPedido = root.querySelector('[name="clienteCpfCnpj"]');
+  if(campoDocPedido) campoDocPedido.addEventListener("change", function(){
+    var cli = buscarClientePorDocumento(campoDocPedido.value);
+    if(cli) preencherClienteNoForm(formPedido, cli);
+  });
+  var campoNomePedido = root.querySelector('[name="clienteNome"]');
+  if(campoNomePedido) campoNomePedido.addEventListener("change", function(){
+    var cli = buscarClientePorNome(campoNomePedido.value);
+    if(cli) preencherClienteNoForm(formPedido, cli);
+  });
+  if(formPedido) wireToggleIE(formPedido, "clienteCpfCnpj", "wrap-ie-pedido");
   root.querySelectorAll("[data-filtro]").forEach(function(b){ b.addEventListener("click", function(){ state.filtroPedidos = b.getAttribute("data-filtro"); render(); }); });
   root.querySelectorAll("[data-confirmar]").forEach(function(b){
     b.addEventListener("click", function(){ b.disabled = true; b.innerHTML = '<span class="spinner"></span>'; confirmarStatus(b.getAttribute("data-confirmar"), b.getAttribute("data-alvo")); });
@@ -1188,6 +1403,34 @@ function wireViewEvents(root){
   root.querySelectorAll("[data-excluir-pedido]").forEach(function(b){ b.addEventListener("click", function(){ excluirPedido(b.getAttribute("data-excluir-pedido")); }); });
   root.querySelectorAll("[data-editar-estoque]").forEach(function(b){ b.addEventListener("click", function(){ abrirEditarEstoque(b.getAttribute("data-editar-estoque")); }); });
   root.querySelectorAll("[data-excluir-estoque]").forEach(function(b){ b.addEventListener("click", function(){ excluirEstoque(b.getAttribute("data-excluir-estoque")); }); });
+  root.querySelectorAll("[data-editar-cliente]").forEach(function(b){ b.addEventListener("click", function(){ abrirEditarCliente(b.getAttribute("data-editar-cliente")); }); });
+  root.querySelectorAll("[data-excluir-cliente]").forEach(function(b){ b.addEventListener("click", function(){ excluirCliente(b.getAttribute("data-excluir-cliente")); }); });
+  var formClienteAdd = $("#form-cliente-add", root);
+  if(formClienteAdd) formClienteAdd.addEventListener("submit", function(e){
+    e.preventDefault();
+    var erro = $("#cliente-erro", root);
+    erro.style.display = "none";
+    var fd = new FormData(formClienteAdd);
+    var nome = (fd.get("nome")||"").toString().trim();
+    if(!nome){ erro.textContent = "Informe o nome."; erro.style.display = "block"; return; }
+    var cpfCnpj = (fd.get("cpfCnpj")||"").toString().trim();
+    var id = clienteId(cpfCnpj, nome);
+    var dados = {
+      nome: nome, cpfCnpj: cpfCnpj,
+      inscricaoEstadual: (fd.get("inscricaoEstadual")||"").toString(),
+      telefone: (fd.get("telefone")||"").toString(),
+      email: (fd.get("email")||"").toString(),
+      endereco: (fd.get("endereco")||"").toString(),
+      criadoEm: new Date().toISOString(), atualizadoEm: new Date().toISOString()
+    };
+    var btnCliente = formClienteAdd.querySelector('button[type="submit"]');
+    btnCliente.disabled = true;
+    setDoc(doc(db,"clientes",id), dados, {merge:true}).then(function(){
+      toast("Cliente salvo."); formClienteAdd.reset(); btnCliente.disabled = false;
+    }).catch(function(){
+      erro.textContent = "Não foi possível salvar agora."; erro.style.display = "block"; btnCliente.disabled = false;
+    });
+  });
   var formEstoqueAdd = $("#form-estoque-add", root);
   if(formEstoqueAdd) formEstoqueAdd.addEventListener("submit", function(e){
     e.preventDefault();
