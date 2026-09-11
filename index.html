@@ -261,19 +261,6 @@ function loginParaEmail(login){
 }
 function fmtNum(n){ n = Number(n)||0; return n.toLocaleString("pt-BR", {maximumFractionDigits:3}); }
 function fmtMoeda(n){ return "R$ " + (Number(n)||0).toLocaleString("pt-BR", {minimumFractionDigits:2, maximumFractionDigits:2}); }
-function calcularValorUnitario(valorPedido, itens){
-  var totalQtd = (itens||[]).reduce(function(s,it){ return s + (Number(it.quantidade)||0); }, 0);
-  if(!totalQtd) return 0;
-  return (Number(valorPedido)||0) / totalQtd;
-}
-function atualizarValorUnitarioPreview(form, itensArr){
-  if(!form) return;
-  var campoValor = form.querySelector('[name="valorPedido"]');
-  var campoUnit = form.querySelector('[name="valorUnitarioPreview"]');
-  if(!campoValor || !campoUnit) return;
-  var unit = calcularValorUnitario(campoValor.value, itensArr);
-  campoUnit.value = unit ? unit.toLocaleString("pt-BR", {minimumFractionDigits:2, maximumFractionDigits:2}) : "";
-}
 function fmtDate(iso){
   if(!iso) return "—";
   try{ var d = new Date(iso); return d.toLocaleDateString("pt-BR")+" "+d.toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"}); }
@@ -896,7 +883,6 @@ function renderNovoPedido(){
       '<div class="field"><label>Observações</label><textarea name="obs" rows="2"></textarea></div>' +
       '<div class="row">' +
         '<div class="field"><label>Valor do pedido (R$)</label><input name="valorPedido" type="number" step="0.01" min="0" placeholder="0,00"></div>' +
-        '<div class="field"><label>Valor unitário (R$)</label><input name="valorUnitarioPreview" readonly placeholder="calculado automaticamente"></div>' +
       '</div>' +
       '<hr class="divider">' +
       '<label style="margin-bottom:10px;">Itens do pedido (sacolas a personalizar)</label>' +
@@ -939,12 +925,11 @@ function renderItensRows(){
     cont.appendChild(row);
   });
   cont.querySelectorAll("[data-it]").forEach(function(inp){
-    inp.addEventListener("input", function(){ novoPedidoItens[Number(inp.getAttribute("data-idx"))][inp.getAttribute("data-it")] = inp.value; atualizarValorUnitarioPreview(cont.closest("form"), novoPedidoItens); });
+    inp.addEventListener("input", function(){ novoPedidoItens[Number(inp.getAttribute("data-idx"))][inp.getAttribute("data-it")] = inp.value; });
   });
   cont.querySelectorAll("[data-remove-item]").forEach(function(b){
     b.addEventListener("click", function(){ novoPedidoItens.splice(Number(b.getAttribute("data-remove-item")),1); renderItensRows(); });
   });
-  atualizarValorUnitarioPreview(cont.closest("form"), novoPedidoItens);
 }
 function readFileAsDataUrl(file){
   return new Promise(function(resolve,reject){
@@ -994,7 +979,6 @@ function submitPedido(form){
         return {categoria:it.categoria, cor:it.cor||"", tamanho:it.tamanho||"", quantidade:Number(it.quantidade), unidade:it.unidade||"un", frente:it.frente||"", verso:it.verso||""};
       }),
       valorPedido: valorPedidoNum,
-      valorUnitario: calcularValorUnitario(valorPedidoNum, itensValidos),
       temArte: !!dataUrl, arteNome: arteFile ? arteFile.name : null,
       status: "aguardando_aprovacao"
     };
@@ -1082,7 +1066,6 @@ function abrirDetalhePedido(numero){
       '<div><label>Vendedor</label><div>'+esc(p.vendedor||"—")+'</div></div>' +
       '<div><label>Produzido por</label><div>'+esc(p.produzidoPor||"—")+'</div></div>' +
       '<div><label>Valor do pedido</label><div>'+(p.valorPedido?fmtMoeda(p.valorPedido):"—")+'</div></div>' +
-      '<div><label>Valor unitário</label><div>'+(p.valorUnitario?fmtMoeda(p.valorUnitario):"—")+'</div></div>' +
       '<div><label>Pigmento</label><div>'+esc(p.pigmento||"—")+'</div></div>' +
       '<div><label>Cor de impressão</label><div>'+esc(p.corImpressao||"—")+'</div></div>' +
       (p.obs ? '<div class="span2"><label>Observações</label><div>'+esc(p.obs)+'</div></div>' : "") +
@@ -1162,7 +1145,6 @@ function preencherJanelaPdfAprovacao(win, p){
     '<table><thead><tr><th>Item</th><th>Cor</th><th>Tamanho</th><th style="text-align:right;">Quantidade</th><th>Impressão frente</th><th>Impressão verso</th></tr></thead><tbody>'+itensHtml+'</tbody></table>' +
     '<div class="valores">' +
       '<div><span>Valor do pedido</span><b>'+fmtMoeda(p.valorPedido)+'</b></div>' +
-      '<div><span>Valor unitário</span><b>'+fmtMoeda(p.valorUnitario)+'</b></div>' +
     '</div>' +
     (p.obs ? '<div class="obs-box"><label>Observações</label>'+esc(p.obs)+'</div>' : "") +
     '<div class="assinatura">' +
@@ -1297,7 +1279,6 @@ function abrirEditarPedido(numero){
       '<div class="field"><label>Observações</label><textarea name="obs" rows="2">'+esc(p.obs)+'</textarea></div>' +
       '<div class="row">' +
         '<div class="field"><label>Valor do pedido (R$)</label><input name="valorPedido" type="number" step="0.01" min="0" value="'+(p.valorPedido||"")+'"></div>' +
-        '<div class="field"><label>Valor unitário (R$)</label><input name="valorUnitarioPreview" readonly></div>' +
       '</div>' +
       '<hr class="divider">' +
       '<label style="margin-bottom:10px;display:block;">Itens do pedido</label>' +
@@ -1322,8 +1303,6 @@ function abrirEditarPedido(numero){
     if(cli) preencherClienteNoForm($("#form-editar-pedido", box), cli);
   });
   wireToggleIE(box, "clienteCpfCnpj", "wrap-ie-pedido-edit");
-  var campoValorPedidoEdit = box.querySelector('[name="valorPedido"]');
-  if(campoValorPedidoEdit) campoValorPedidoEdit.addEventListener("input", function(){ atualizarValorUnitarioPreview($("#form-editar-pedido", box), editPedidoItens); });
   $("#modal-op-fechar", box).addEventListener("click", fecharModalPedido);
   $("#btn-cancelar-edicao", box).addEventListener("click", fecharModalPedido);
   $("#btn-add-item-edit", box).addEventListener("click", function(){ editPedidoItens.push({categoria:"",cor:"",tamanho:"",quantidade:"",unidade:"un",frente:"",verso:""}); renderEditItensRows(); });
@@ -1360,12 +1339,11 @@ function renderEditItensRows(){
     cont.appendChild(row);
   });
   cont.querySelectorAll("[data-eit]").forEach(function(inp){
-    inp.addEventListener("input", function(){ editPedidoItens[Number(inp.getAttribute("data-eidx"))][inp.getAttribute("data-eit")] = inp.value; atualizarValorUnitarioPreview(cont.closest("form"), editPedidoItens); });
+    inp.addEventListener("input", function(){ editPedidoItens[Number(inp.getAttribute("data-eidx"))][inp.getAttribute("data-eit")] = inp.value; });
   });
   cont.querySelectorAll("[data-remove-eitem]").forEach(function(b){
     b.addEventListener("click", function(){ editPedidoItens.splice(Number(b.getAttribute("data-remove-eitem")),1); renderEditItensRows(); });
   });
-  atualizarValorUnitarioPreview(cont.closest("form"), editPedidoItens);
 }
 function salvarEdicaoPedido(box){
   var erro = $("#editar-pedido-erro", box);
@@ -1397,7 +1375,6 @@ function salvarEdicaoPedido(box){
     obs: (fd.get("obs")||"").toString(),
     itens: itensFinais,
     valorPedido: Number(fd.get("valorPedido")) || 0,
-    valorUnitario: calcularValorUnitario(Number(fd.get("valorPedido")) || 0, itensFinais),
     editadoEm: new Date().toISOString(),
     editadoPor: state.user.nome || state.user.login
   };
@@ -1501,8 +1478,6 @@ function wireViewEvents(root){
   if(btnAddItem) btnAddItem.addEventListener("click", function(){ novoPedidoItens.push({categoria:"",cor:"",tamanho:"",quantidade:"",unidade:"un",frente:"",verso:""}); renderItensRows(); });
   var formPedido = $("#form-pedido", root);
   if(formPedido) formPedido.addEventListener("submit", function(e){ e.preventDefault(); submitPedido(formPedido); });
-  var campoValorPedido = root.querySelector('[name="valorPedido"]');
-  if(campoValorPedido) campoValorPedido.addEventListener("input", function(){ atualizarValorUnitarioPreview(formPedido, novoPedidoItens); });
   var campoDocPedido = root.querySelector('[name="clienteCpfCnpj"]');
   if(campoDocPedido) campoDocPedido.addEventListener("change", function(){
     var cli = buscarClientePorDocumento(campoDocPedido.value);
