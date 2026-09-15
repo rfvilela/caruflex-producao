@@ -1044,7 +1044,8 @@ function abrirDetalhePedido(numero){
   }
   var arteBtn = p.temArte ? '<button class="btn btn-ghost btn-sm" type="button" data-ver-arte="'+esc(p.numero)+'">Ver arte (PDF)</button>' : '<span class="hint">Sem arte anexada</span>';
   var podeEditarPedido = state.user && (state.user.setor==="comercial" || state.user.setor==="admin");
-  var editBtn = podeEditarPedido ? '<button class="btn btn-ghost btn-sm" type="button" data-editar-pedido="'+esc(p.numero)+'">Editar</button>' : "";
+  var podeSoEditarPedido = podeEditarPedido || (state.user && state.user.setor==="producao");
+  var editBtn = podeSoEditarPedido ? '<button class="btn btn-ghost btn-sm" type="button" data-editar-pedido="'+esc(p.numero)+'">Editar</button>' : "";
   var excluirBtn = podeEditarPedido ? '<button class="btn btn-danger btn-sm" type="button" data-excluir-pedido="'+esc(p.numero)+'">Excluir</button>' : "";
   var pdfBtn = '<button class="btn btn-ghost btn-sm" type="button" data-pdf-aprovacao="'+esc(p.numero)+'">PDF de Aprovação</button>';
   var enviarProducaoBtn = (podeEditarPedido && p.status==="aguardando_aprovacao") ? '<button class="btn btn-success btn-sm" type="button" data-enviar-producao="'+esc(p.numero)+'">Enviar para Produção</button>' : "";
@@ -1191,7 +1192,8 @@ function renderPedidoCard(p){
     confirmBtn = '<button class="btn btn-success btn-sm" type="button" data-confirmar="'+esc(p.numero)+'" data-alvo="concluido">Confirmar Conclusão</button>';
   }
   var podeEditarPedidoCard = state.user && (state.user.setor==="comercial" || state.user.setor==="admin");
-  var editBtnCard = podeEditarPedidoCard ? '<button class="btn btn-ghost btn-sm" type="button" data-editar-pedido="'+esc(p.numero)+'">Editar</button>' : "";
+  var podeSoEditarPedidoCard = podeEditarPedidoCard || (state.user && state.user.setor==="producao");
+  var editBtnCard = podeSoEditarPedidoCard ? '<button class="btn btn-ghost btn-sm" type="button" data-editar-pedido="'+esc(p.numero)+'">Editar</button>' : "";
   var excluirBtnCard = podeEditarPedidoCard ? '<button class="btn btn-danger btn-sm" type="button" data-excluir-pedido="'+esc(p.numero)+'">Excluir</button>' : "";
   var pdfBtnCard = '<button class="btn btn-ghost btn-sm" type="button" data-pdf-aprovacao="'+esc(p.numero)+'">PDF de Aprovação</button>';
   var enviarProducaoBtnCard = (podeEditarPedidoCard && p.status==="aguardando_aprovacao") ? '<button class="btn btn-success btn-sm" type="button" data-enviar-producao="'+esc(p.numero)+'">Enviar para Produção</button>' : "";
