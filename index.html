@@ -1045,7 +1045,7 @@ function abrirDetalhePedido(numero){
   var itensHtml = (p.itens||[]).map(function(it){
     return '<div class="detalhe-item">' +
       '<div class="detalhe-item-head"><span>'+esc(it.categoria)+(it.cor?" · "+esc(it.cor):"")+(it.tamanho?" · "+esc(it.tamanho):"")+'</span><span class="qty">'+fmtNum(it.quantidade)+' '+esc(it.unidade)+'</span></div>' +
-      (it.valorUnitario ? '<div class="detalhe-item-imp">'+fmtMoeda(it.valorUnitario)+'/'+esc(it.unidade)+' · Subtotal: '+fmtMoeda(Number(it.valorUnitario)*Number(it.quantidade))+'</div>' : "") +
+      (it.valorUnitario ? '<div class="detalhe-item-imp">'+fmtMoeda(it.valorUnitario)+'/'+esc(it.unidade)+'</div>' : "") +
       ((it.frente||it.verso) ? '<div class="detalhe-item-imp">'+(it.frente?"Frente: "+esc(it.frente):"")+(it.frente&&it.verso?" · ":"")+(it.verso?"Verso: "+esc(it.verso):"")+'</div>' : "") +
     '</div>';
   }).join("") || '<div class="hint">Nenhum item.</div>';
@@ -1119,11 +1119,9 @@ function fecharModalPedido(){
 }
 function preencherJanelaPdfAprovacao(win, p){
   var itensHtml = (p.itens||[]).map(function(it){
-    var subtotal = (Number(it.valorUnitario)||0) * (Number(it.quantidade)||0);
     return '<tr><td>'+esc(it.categoria)+'</td><td>'+esc(it.cor||"—")+'</td><td>'+esc(it.tamanho||"—")+'</td>' +
       '<td style="text-align:right;">'+fmtNum(it.quantidade)+' '+esc(it.unidade)+'</td>' +
       '<td style="text-align:right;">'+(it.valorUnitario?fmtMoeda(it.valorUnitario):"—")+'</td>' +
-      '<td style="text-align:right;">'+(it.valorUnitario?fmtMoeda(subtotal):"—")+'</td>' +
       '<td>'+esc(it.frente||"—")+'</td><td>'+esc(it.verso||"—")+'</td></tr>';
   }).join("");
   var agora = new Date();
@@ -1157,13 +1155,14 @@ function preencherJanelaPdfAprovacao(win, p){
     '<div class="sub">Ordem '+esc(p.numero)+' · Gerado em '+agora.toLocaleDateString("pt-BR")+' às '+agora.toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"})+'</div>' +
     '<div class="grid">' +
       '<div><label>Cliente</label>'+esc((p.cliente&&p.cliente.nome)||"—")+'</div>' +
+      '<div><label>Vendedor</label>'+esc(p.vendedor||"—")+'</div>' +
       '<div><label>Telefone</label>'+esc((p.cliente&&p.cliente.telefone)||"—")+'</div>' +
       '<div><label>Endereço</label>'+esc((p.cliente&&p.cliente.endereco)||"—")+'</div>' +
       '<div><label>Marca</label>'+esc(p.marca||"—")+'</div>' +
       '<div><label>Tipo de pedido</label>'+esc(tipoPedidoLabel(p.tipoPedido))+'</div>' +
       '<div><label>Previsão de entrega</label>'+(p.previsaoDias!=null?esc(p.previsaoDias)+" dia(s)":"—")+'</div>' +
     '</div>' +
-    '<table><thead><tr><th>Item</th><th>Cor</th><th>Tamanho</th><th style="text-align:right;">Quantidade</th><th style="text-align:right;">Valor unitário</th><th style="text-align:right;">Subtotal</th><th>Impressão frente</th><th>Impressão verso</th></tr></thead><tbody>'+itensHtml+'</tbody></table>' +
+    '<table><thead><tr><th>Item</th><th>Cor</th><th>Tamanho</th><th style="text-align:right;">Quantidade</th><th style="text-align:right;">Valor unitário</th><th>Impressão frente</th><th>Impressão verso</th></tr></thead><tbody>'+itensHtml+'</tbody></table>' +
     '<div class="valores">' +
       '<div><span>Valor do pedido</span><b>'+fmtMoeda(p.valorPedido)+'</b></div>' +
     '</div>' +
