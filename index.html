@@ -261,6 +261,16 @@ function loginParaEmail(login){
 }
 function fmtNum(n){ n = Number(n)||0; return n.toLocaleString("pt-BR", {maximumFractionDigits:3}); }
 function fmtMoeda(n){ return "R$ " + (Number(n)||0).toLocaleString("pt-BR", {minimumFractionDigits:2, maximumFractionDigits:2}); }
+function calcularValorPedidoTotal(itens){
+  return (itens||[]).reduce(function(s,it){ return s + ((Number(it.valorUnitario)||0) * (Number(it.quantidade)||0)); }, 0);
+}
+function atualizarValorPedidoPreview(form, itensArr){
+  if(!form) return;
+  var campoTotal = form.querySelector('[name="valorPedido"]');
+  if(!campoTotal) return;
+  var total = calcularValorPedidoTotal(itensArr);
+  campoTotal.value = total ? total.toFixed(2) : "";
+}
 function fmtDate(iso){
   if(!iso) return "—";
   try{ var d = new Date(iso); return d.toLocaleDateString("pt-BR")+" "+d.toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"}); }
@@ -846,7 +856,7 @@ function excluirCliente(id){
     .catch(function(){ toast("Não foi possível excluir agora. Tente novamente."); });
 }
 // ---------- NOVO PEDIDO ----------
-var novoPedidoItens = [{categoria:"",cor:"",tamanho:"",quantidade:"",unidade:"un",frente:"",verso:""}];
+var novoPedidoItens = [{categoria:"",cor:"",tamanho:"",quantidade:"",unidade:"un",frente:"",verso:"",valorUnitario:""}];
 function renderNovoPedido(){
   var box = el("div");
   box.innerHTML =
@@ -882,13 +892,14 @@ function renderNovoPedido(){
       '</div>' +
       '<datalist id="dl-producao">' + state.cache.usuarios.filter(function(u){return u.setor==="producao";}).map(function(u){return '<option value="'+esc(u.nome||u.login)+'">';}).join("") + '</datalist>' +
       '<div class="field"><label>Observações</label><textarea name="obs" rows="2"></textarea></div>' +
-      '<div class="row">' +
-        '<div class="field"><label>Valor do pedido (R$)</label><input name="valorPedido" type="number" step="0.01" min="0" placeholder="0,00"></div>' +
-      '</div>' +
       '<hr class="divider">' +
       '<label style="margin-bottom:10px;">Itens do pedido (sacolas a personalizar)</label>' +
+      '<div class="hint" style="margin-bottom:6px;">Digite o valor unitário de cada item — o valor pode variar de cliente para cliente.</div>' +
       '<div class="stack" id="itens-container"></div>' +
       '<button class="btn btn-ghost btn-sm" id="btn-add-item" type="button" style="margin-top:10px;">+ Adicionar item</button>' +
+      '<div class="row">' +
+        '<div class="field"><label>Valor total do pedido (R$)</label><input name="valorPedido" type="number" step="0.01" min="0" readonly placeholder="calculado automaticamente"></div>' +
+      '</div>' +
       '<hr class="divider">' +
       '<div class="field"><label>Arte aprovada pelo cliente (PDF, até 650KB)</label>' +
         '<div class="file-input-wrap"><input type="file" name="arte" accept="application/pdf" id="input-arte"></div>' +
@@ -918,6 +929,7 @@ function renderItensRows(){
         '<div class="field"><label>Unidade</label><select data-it="unidade" data-idx="'+idx+'">' +
           ['un','kg','milheiro'].map(function(u){return '<option value="'+u+'"'+(it.unidade===u?" selected":"")+'>'+(u==='un'?'Unidades':u==='kg'?'Quilos (kg)':'Milheiro')+'</option>';}).join("") +
           '</select></div>' +
+        '<div class="field"><label>Valor unitário (R$)</label><input type="number" step="0.01" min="0" data-it="valorUnitario" data-idx="'+idx+'" value="'+esc(it.valorUnitario)+'" placeholder="0,00"></div>' +
       '</div>' +
       '<div class="row">' +
         '<div class="field"><label>Impressão frente</label><input data-it="frente" data-idx="'+idx+'" value="'+esc(it.frente)+'" placeholder="ex: logo azul"></div>' +
@@ -926,11 +938,12 @@ function renderItensRows(){
     cont.appendChild(row);
   });
   cont.querySelectorAll("[data-it]").forEach(function(inp){
-    inp.addEventListener("input", function(){ novoPedidoItens[Number(inp.getAttribute("data-idx"))][inp.getAttribute("data-it")] = inp.value; });
+    inp.addEventListener("input", function(){ novoPedidoItens[Number(inp.getAttribute("data-idx"))][inp.getAttribute("data-it")] = inp.value; atualizarValorPedidoPreview(cont.closest("form"), novoPedidoItens); });
   });
   cont.querySelectorAll("[data-remove-item]").forEach(function(b){
     b.addEventListener("click", function(){ novoPedidoItens.splice(Number(b.getAttribute("data-remove-item")),1); renderItensRows(); });
   });
+  atualizarValorPedidoPreview(cont.closest("form"), novoPedidoItens);
 }
 function readFileAsDataUrl(file){
   return new Promise(function(resolve,reject){
@@ -960,7 +973,6 @@ function submitPedido(form){
   var uploadPromise = arteFile ? readFileAsDataUrl(arteFile) : Promise.resolve(null);
   uploadPromise.then(function(dataUrl){
     var numero = orderNumero();
-    var valorPedidoNum = Number(fd.get("valorPedido")) || 0;
     var pedido = {
       numero: numero,
       criadoEm: new Date().toISOString(),
@@ -977,18 +989,18 @@ function submitPedido(form){
       corImpressao: (fd.get("corImpressao")||"").toString(),
       obs: (fd.get("obs")||"").toString(),
       itens: itensValidos.map(function(it){
-        return {categoria:it.categoria, cor:it.cor||"", tamanho:it.tamanho||"", quantidade:Number(it.quantidade), unidade:it.unidade||"un", frente:it.frente||"", verso:it.verso||""};
+        return {categoria:it.categoria, cor:it.cor||"", tamanho:it.tamanho||"", quantidade:Number(it.quantidade), unidade:it.unidade||"un", frente:it.frente||"", verso:it.verso||"", valorUnitario:Number(it.valorUnitario)||0};
       }),
-      valorPedido: valorPedidoNum,
       temArte: !!dataUrl, arteNome: arteFile ? arteFile.name : null,
       status: "aguardando_aprovacao"
     };
+    pedido.valorPedido = calcularValorPedidoTotal(pedido.itens);
     setDoc(doc(db,"pedidos",numero), pedido).then(function(){
       return dataUrl ? setDoc(doc(db,"artesPedidos",numero), {dataUrl:dataUrl, nome:arteFile.name, criadoEm:new Date().toISOString()}) : null;
     }).then(function(){
       sincronizarClienteFromPedido(pedido.cliente);
       toast("Ordem "+numero+" criada. Envie o PDF para o cliente aprovar antes de mandar para a produção.");
-      novoPedidoItens = [{categoria:"",cor:"",tamanho:"",quantidade:"",unidade:"un",frente:"",verso:""}];
+      novoPedidoItens = [{categoria:"",cor:"",tamanho:"",quantidade:"",unidade:"un",frente:"",verso:"",valorUnitario:""}];
       state.view = "pedidos"; render();
       if(pdfWin){ preencherJanelaPdfAprovacao(pdfWin, pedido); } else { toast("Permita pop-ups para ver o PDF, ou use o botão \"PDF de Aprovação\" no pedido."); }
     }).catch(function(){
@@ -1033,6 +1045,7 @@ function abrirDetalhePedido(numero){
   var itensHtml = (p.itens||[]).map(function(it){
     return '<div class="detalhe-item">' +
       '<div class="detalhe-item-head"><span>'+esc(it.categoria)+(it.cor?" · "+esc(it.cor):"")+(it.tamanho?" · "+esc(it.tamanho):"")+'</span><span class="qty">'+fmtNum(it.quantidade)+' '+esc(it.unidade)+'</span></div>' +
+      (it.valorUnitario ? '<div class="detalhe-item-imp">'+fmtMoeda(it.valorUnitario)+'/'+esc(it.unidade)+' · Subtotal: '+fmtMoeda(Number(it.valorUnitario)*Number(it.quantidade))+'</div>' : "") +
       ((it.frente||it.verso) ? '<div class="detalhe-item-imp">'+(it.frente?"Frente: "+esc(it.frente):"")+(it.frente&&it.verso?" · ":"")+(it.verso?"Verso: "+esc(it.verso):"")+'</div>' : "") +
     '</div>';
   }).join("") || '<div class="hint">Nenhum item.</div>';
@@ -1106,8 +1119,11 @@ function fecharModalPedido(){
 }
 function preencherJanelaPdfAprovacao(win, p){
   var itensHtml = (p.itens||[]).map(function(it){
+    var subtotal = (Number(it.valorUnitario)||0) * (Number(it.quantidade)||0);
     return '<tr><td>'+esc(it.categoria)+'</td><td>'+esc(it.cor||"—")+'</td><td>'+esc(it.tamanho||"—")+'</td>' +
       '<td style="text-align:right;">'+fmtNum(it.quantidade)+' '+esc(it.unidade)+'</td>' +
+      '<td style="text-align:right;">'+(it.valorUnitario?fmtMoeda(it.valorUnitario):"—")+'</td>' +
+      '<td style="text-align:right;">'+(it.valorUnitario?fmtMoeda(subtotal):"—")+'</td>' +
       '<td>'+esc(it.frente||"—")+'</td><td>'+esc(it.verso||"—")+'</td></tr>';
   }).join("");
   var agora = new Date();
@@ -1147,7 +1163,7 @@ function preencherJanelaPdfAprovacao(win, p){
       '<div><label>Tipo de pedido</label>'+esc(tipoPedidoLabel(p.tipoPedido))+'</div>' +
       '<div><label>Previsão de entrega</label>'+(p.previsaoDias!=null?esc(p.previsaoDias)+" dia(s)":"—")+'</div>' +
     '</div>' +
-    '<table><thead><tr><th>Item</th><th>Cor</th><th>Tamanho</th><th style="text-align:right;">Quantidade</th><th>Impressão frente</th><th>Impressão verso</th></tr></thead><tbody>'+itensHtml+'</tbody></table>' +
+    '<table><thead><tr><th>Item</th><th>Cor</th><th>Tamanho</th><th style="text-align:right;">Quantidade</th><th style="text-align:right;">Valor unitário</th><th style="text-align:right;">Subtotal</th><th>Impressão frente</th><th>Impressão verso</th></tr></thead><tbody>'+itensHtml+'</tbody></table>' +
     '<div class="valores">' +
       '<div><span>Valor do pedido</span><b>'+fmtMoeda(p.valorPedido)+'</b></div>' +
     '</div>' +
@@ -1248,7 +1264,7 @@ function abrirEditarPedido(numero){
   if(!p){ toast("Pedido não encontrado."); return; }
   editPedidoNumero = numero;
   editPedidoItens = (p.itens||[]).map(function(it){ return Object.assign({}, it); });
-  if(editPedidoItens.length===0) editPedidoItens.push({categoria:"",cor:"",tamanho:"",quantidade:"",unidade:"un",frente:"",verso:""});
+  if(editPedidoItens.length===0) editPedidoItens.push({categoria:"",cor:"",tamanho:"",quantidade:"",unidade:"un",frente:"",verso:"",valorUnitario:""});
   var modal = $("#modal-op");
   var box = $(".modal-box", modal);
   box.innerHTML =
@@ -1283,13 +1299,14 @@ function abrirEditarPedido(numero){
       '</div>' +
       '<datalist id="dl-producao-edit">' + state.cache.usuarios.filter(function(u){return u.setor==="producao";}).map(function(u){return '<option value="'+esc(u.nome||u.login)+'">';}).join("") + '</datalist>' +
       '<div class="field"><label>Observações</label><textarea name="obs" rows="2">'+esc(p.obs)+'</textarea></div>' +
-      '<div class="row">' +
-        '<div class="field"><label>Valor do pedido (R$)</label><input name="valorPedido" type="number" step="0.01" min="0" value="'+(p.valorPedido||"")+'"></div>' +
-      '</div>' +
       '<hr class="divider">' +
       '<label style="margin-bottom:10px;display:block;">Itens do pedido</label>' +
+      '<div class="hint" style="margin-bottom:6px;">Digite o valor unitário de cada item — o valor pode variar de cliente para cliente.</div>' +
       '<div class="stack" id="edit-itens-container"></div>' +
       '<button class="btn btn-ghost btn-sm" id="btn-add-item-edit" type="button" style="margin-top:10px;">+ Adicionar item</button>' +
+      '<div class="row">' +
+        '<div class="field"><label>Valor total do pedido (R$)</label><input name="valorPedido" type="number" step="0.01" min="0" readonly value="'+(p.valorPedido||"")+'"></div>' +
+      '</div>' +
       '<hr class="divider">' +
       '<div id="editar-pedido-erro" class="error-msg" style="display:none;"></div>' +
       '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px;">' +
@@ -1311,7 +1328,7 @@ function abrirEditarPedido(numero){
   wireToggleIE(box, "clienteCpfCnpj", "wrap-ie-pedido-edit");
   $("#modal-op-fechar", box).addEventListener("click", fecharModalPedido);
   $("#btn-cancelar-edicao", box).addEventListener("click", fecharModalPedido);
-  $("#btn-add-item-edit", box).addEventListener("click", function(){ editPedidoItens.push({categoria:"",cor:"",tamanho:"",quantidade:"",unidade:"un",frente:"",verso:""}); renderEditItensRows(); });
+  $("#btn-add-item-edit", box).addEventListener("click", function(){ editPedidoItens.push({categoria:"",cor:"",tamanho:"",quantidade:"",unidade:"un",frente:"",verso:"",valorUnitario:""}); renderEditItensRows(); });
   var tipoSelEdit = box.querySelector('select[name="tipoPedido"]');
   tipoSelEdit.addEventListener("change", function(){ $("#wrap-alteracao-edit", box).style.display = tipoSelEdit.value==="alteracao" ? "block" : "none"; });
   $("#form-editar-pedido", box).addEventListener("submit", function(e){ e.preventDefault(); salvarEdicaoPedido(box); });
@@ -1337,6 +1354,7 @@ function renderEditItensRows(){
         '<div class="field"><label>Unidade</label><select data-eit="unidade" data-eidx="'+idx+'">' +
           ['un','kg','milheiro'].map(function(u){return '<option value="'+u+'"'+(it.unidade===u?" selected":"")+'>'+(u==='un'?'Unidades':u==='kg'?'Quilos (kg)':'Milheiro')+'</option>';}).join("") +
           '</select></div>' +
+        '<div class="field"><label>Valor unitário (R$)</label><input type="number" step="0.01" min="0" data-eit="valorUnitario" data-eidx="'+idx+'" value="'+esc(it.valorUnitario)+'" placeholder="0,00"></div>' +
       '</div>' +
       '<div class="row">' +
         '<div class="field"><label>Impressão frente</label><input data-eit="frente" data-eidx="'+idx+'" value="'+esc(it.frente)+'"></div>' +
@@ -1345,11 +1363,12 @@ function renderEditItensRows(){
     cont.appendChild(row);
   });
   cont.querySelectorAll("[data-eit]").forEach(function(inp){
-    inp.addEventListener("input", function(){ editPedidoItens[Number(inp.getAttribute("data-eidx"))][inp.getAttribute("data-eit")] = inp.value; });
+    inp.addEventListener("input", function(){ editPedidoItens[Number(inp.getAttribute("data-eidx"))][inp.getAttribute("data-eit")] = inp.value; atualizarValorPedidoPreview(cont.closest("form"), editPedidoItens); });
   });
   cont.querySelectorAll("[data-remove-eitem]").forEach(function(b){
     b.addEventListener("click", function(){ editPedidoItens.splice(Number(b.getAttribute("data-remove-eitem")),1); renderEditItensRows(); });
   });
+  atualizarValorPedidoPreview(cont.closest("form"), editPedidoItens);
 }
 function salvarEdicaoPedido(box){
   var erro = $("#editar-pedido-erro", box);
@@ -1366,7 +1385,7 @@ function salvarEdicaoPedido(box){
   var btn = $("#btn-salvar-edicao", box);
   btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Salvando…';
   var itensFinais = itensValidos.map(function(it){
-    return {categoria:it.categoria, cor:it.cor||"", tamanho:it.tamanho||"", quantidade:Number(it.quantidade), unidade:it.unidade||"un", frente:it.frente||"", verso:it.verso||""};
+    return {categoria:it.categoria, cor:it.cor||"", tamanho:it.tamanho||"", quantidade:Number(it.quantidade), unidade:it.unidade||"un", frente:it.frente||"", verso:it.verso||"", valorUnitario:Number(it.valorUnitario)||0};
   });
   var patch = {
     cliente: { nome: clienteNome, telefone: (fd.get("clienteTelefone")||"").toString(), endereco: (fd.get("clienteEndereco")||"").toString(), cpfCnpj: (fd.get("clienteCpfCnpj")||"").toString(), email: (fd.get("clienteEmail")||"").toString(), inscricaoEstadual: (fd.get("clienteInscricaoEstadual")||"").toString() },
@@ -1380,7 +1399,7 @@ function salvarEdicaoPedido(box){
     corImpressao: (fd.get("corImpressao")||"").toString(),
     obs: (fd.get("obs")||"").toString(),
     itens: itensFinais,
-    valorPedido: Number(fd.get("valorPedido")) || 0,
+    valorPedido: calcularValorPedidoTotal(itensFinais),
     editadoEm: new Date().toISOString(),
     editadoPor: state.user.nome || state.user.login
   };
@@ -1481,7 +1500,7 @@ function wireViewEvents(root){
   var tipoPedidoSel = root.querySelector('select[name="tipoPedido"]');
   if(tipoPedidoSel) tipoPedidoSel.addEventListener("change", function(){ $("#wrap-alteracao").style.display = tipoPedidoSel.value==="alteracao" ? "block" : "none"; });
   var btnAddItem = $("#btn-add-item", root);
-  if(btnAddItem) btnAddItem.addEventListener("click", function(){ novoPedidoItens.push({categoria:"",cor:"",tamanho:"",quantidade:"",unidade:"un",frente:"",verso:""}); renderItensRows(); });
+  if(btnAddItem) btnAddItem.addEventListener("click", function(){ novoPedidoItens.push({categoria:"",cor:"",tamanho:"",quantidade:"",unidade:"un",frente:"",verso:"",valorUnitario:""}); renderItensRows(); });
   var formPedido = $("#form-pedido", root);
   if(formPedido) formPedido.addEventListener("submit", function(e){ e.preventDefault(); submitPedido(formPedido); });
   var campoDocPedido = root.querySelector('[name="clienteCpfCnpj"]');
