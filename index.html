@@ -1024,6 +1024,36 @@ function abrirArte(numero){
     abrirBlobPdf(dataUrl);
   }).catch(function(){ toast("Não foi possível abrir a arte agora."); });
 }
+function anexarArte(numero){
+  var podeAnexar = state.user && (state.user.setor==="comercial" || state.user.setor==="admin" || state.user.setor==="producao");
+  if(!podeAnexar) return;
+  var input = document.createElement("input");
+  input.type = "file"; input.accept = "application/pdf"; input.style.display = "none";
+  input.addEventListener("change", function(){
+    var file = input.files[0];
+    document.body.removeChild(input);
+    if(!file) return;
+    if(file.size > TAMANHO_MAX_ARTE){
+      toast("O PDF da arte está muito grande (máx. 650KB). Comprima o arquivo e tente novamente.");
+      return;
+    }
+    toast("Enviando arte…");
+    readFileAsDataUrl(file).then(function(dataUrl){
+      return setDoc(doc(db,"artesPedidos",numero), {dataUrl:dataUrl, nome:file.name, criadoEm:new Date().toISOString()}).then(function(){
+        return updateDoc(doc(db,"pedidos",numero), {temArte:true, arteNome:file.name});
+      });
+    }).then(function(){
+      delete state.arteCache[numero];
+      toast("Arte anexada com sucesso.");
+      var modal = $("#modal-op");
+      if(modal && !modal.hidden) abrirDetalhePedido(numero);
+    }).catch(function(){
+      toast("Não foi possível anexar a arte agora. Tente novamente.");
+    });
+  });
+  document.body.appendChild(input);
+  input.click();
+}
 function abrirBlobPdf(dataUrl){
   try{
     var parts = dataUrl.split(",");
@@ -1056,7 +1086,9 @@ function abrirDetalhePedido(numero){
   } else if(podeConfirmar && p.status==="recebido"){
     confirmBtn = '<button class="btn btn-success btn-sm" type="button" data-confirmar="'+esc(p.numero)+'" data-alvo="concluido">Confirmar Conclusão</button>';
   }
-  var arteBtn = p.temArte ? '<button class="btn btn-ghost btn-sm" type="button" data-ver-arte="'+esc(p.numero)+'">Ver arte (PDF)</button>' : '<span class="hint">Sem arte anexada</span>';
+  var podeAnexarArte = state.user && (state.user.setor==="comercial" || state.user.setor==="admin" || state.user.setor==="producao");
+  var arteBtn = (p.temArte ? '<button class="btn btn-ghost btn-sm" type="button" data-ver-arte="'+esc(p.numero)+'">Ver arte (PDF)</button>' : (podeAnexarArte ? "" : '<span class="hint">Sem arte anexada</span>')) +
+    (podeAnexarArte ? '<button class="btn btn-ghost btn-sm" type="button" data-anexar-arte="'+esc(p.numero)+'">'+(p.temArte?"Substituir arte":"Anexar arte")+'</button>' : "");
   var podeEditarPedido = state.user && (state.user.setor==="comercial" || state.user.setor==="admin");
   var podeSoEditarPedido = podeEditarPedido || (state.user && state.user.setor==="producao");
   var editBtn = podeSoEditarPedido ? '<button class="btn btn-ghost btn-sm" type="button" data-editar-pedido="'+esc(p.numero)+'">Editar</button>' : "";
@@ -1096,6 +1128,7 @@ function abrirDetalhePedido(numero){
     '</div>' +
     '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;">'+arteBtn+confirmBtn+pdfBtn+enviarProducaoBtn+editBtn+excluirBtn+'</div>';
   box.querySelectorAll("[data-ver-arte]").forEach(function(b){ b.addEventListener("click", function(){ abrirArte(b.getAttribute("data-ver-arte")); }); });
+  box.querySelectorAll("[data-anexar-arte]").forEach(function(b){ b.addEventListener("click", function(){ anexarArte(b.getAttribute("data-anexar-arte")); }); });
   box.querySelectorAll("[data-pdf-aprovacao]").forEach(function(b){ b.addEventListener("click", function(){ abrirPdfAprovacao(b.getAttribute("data-pdf-aprovacao")); }); });
   box.querySelectorAll("[data-enviar-producao]").forEach(function(b){ b.addEventListener("click", function(){ enviarParaProducao(b.getAttribute("data-enviar-producao")); }); });
   box.querySelectorAll("[data-confirmar]").forEach(function(b){
@@ -1202,7 +1235,9 @@ function renderPedidoCard(p){
   var itensHtml = (p.itens||[]).map(function(it){
     return '<div class="it"><span>'+esc(it.categoria)+(it.cor?" · "+esc(it.cor):"")+(it.tamanho?" · "+esc(it.tamanho):"")+'</span><span class="qty">'+fmtNum(it.quantidade)+' '+esc(it.unidade)+'</span></div>';
   }).join("");
-  var arteBtn = p.temArte ? '<button class="btn btn-ghost btn-sm" type="button" data-ver-arte="'+esc(p.numero)+'">Ver arte (PDF)</button>' : '<span class="hint">Sem arte anexada</span>';
+  var podeAnexarArteCard = state.user && (state.user.setor==="comercial" || state.user.setor==="admin" || state.user.setor==="producao");
+  var arteBtn = (p.temArte ? '<button class="btn btn-ghost btn-sm" type="button" data-ver-arte="'+esc(p.numero)+'">Ver arte (PDF)</button>' : (podeAnexarArteCard ? "" : '<span class="hint">Sem arte anexada</span>')) +
+    (podeAnexarArteCard ? '<button class="btn btn-ghost btn-sm" type="button" data-anexar-arte="'+esc(p.numero)+'">'+(p.temArte?"Substituir arte":"Anexar arte")+'</button>' : "");
   var podeConfirmar = state.user && (state.user.setor==="producao" || state.user.setor==="admin");
   var confirmBtn = "";
   if(podeConfirmar && p.status==="enviado"){
@@ -1518,6 +1553,7 @@ function wireViewEvents(root){
     b.addEventListener("click", function(){ b.disabled = true; b.innerHTML = '<span class="spinner"></span>'; confirmarStatus(b.getAttribute("data-confirmar"), b.getAttribute("data-alvo")); });
   });
   root.querySelectorAll("[data-ver-arte]").forEach(function(b){ b.addEventListener("click", function(){ abrirArte(b.getAttribute("data-ver-arte")); }); });
+  root.querySelectorAll("[data-anexar-arte]").forEach(function(b){ b.addEventListener("click", function(){ anexarArte(b.getAttribute("data-anexar-arte")); }); });
   root.querySelectorAll("[data-abrir-op]").forEach(function(c){
     c.addEventListener("click", function(e){
       if(e.target.closest("button")) return;
