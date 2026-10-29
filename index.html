@@ -225,7 +225,7 @@ var state = {
   authUser: null, user: null,
   view: "login",
   filtroPedidos: "todos",
-  filtroRelDataIni: "", filtroRelDataFim: "", filtroRelVendedor: "",
+  filtroRelDataIni: "", filtroRelDataFim: "", filtroRelVendedor: "", relatorioPagina: 0,
   bootstrapNecessario: null,
   cache: { estoque: [], pedidos: [], usuarios: [], clientes: [] },
   arteCache: {},
@@ -712,6 +712,7 @@ function pedidosFiltradosRelatorio(){
     return true;
   }).sort(function(a,b){ return (b.dataPedido||b.criadoEm||"").localeCompare(a.dataPedido||a.criadoEm||""); });
 }
+var RELATORIO_PAGE_SIZE = 20;
 function renderResultadoRelatorio(){
   var cont = $("#rel-resultado");
   if(!cont) return;
@@ -721,14 +722,30 @@ function renderResultadoRelatorio(){
     return;
   }
   var total = list.reduce(function(s,p){ return s + (Number(p.valorPedido)||0); }, 0);
-  var rows = list.map(function(p){
+  var totalPaginas = Math.max(1, Math.ceil(list.length / RELATORIO_PAGE_SIZE));
+  if(state.relatorioPagina >= totalPaginas) state.relatorioPagina = totalPaginas - 1;
+  if(state.relatorioPagina < 0) state.relatorioPagina = 0;
+  var inicio = state.relatorioPagina * RELATORIO_PAGE_SIZE;
+  var pagina = list.slice(inicio, inicio + RELATORIO_PAGE_SIZE);
+  var rows = pagina.map(function(p){
     return '<tr><td>'+esc(p.numero)+'</td><td>'+(p.dataPedido?fmtDateOnly(p.dataPedido):fmtDate(p.criadoEm))+'</td>' +
       '<td>'+esc((p.cliente&&p.cliente.nome)||"—")+'</td><td>'+esc(p.vendedor||"—")+'</td>' +
       '<td>'+esc(statusLabel(p.status))+'</td><td style="text-align:right;">'+(p.valorPedido?fmtMoeda(p.valorPedido):"—")+'</td></tr>';
   }).join("");
+  var pagerHtml =
+    '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:10px;flex-wrap:wrap;">' +
+      '<button class="btn btn-ghost btn-sm" id="rel-pagina-anterior" type="button"'+(state.relatorioPagina<=0?" disabled":"")+'>← Anterior</button>' +
+      '<span class="hint">Página '+(state.relatorioPagina+1)+' de '+totalPaginas+'</span>' +
+      '<button class="btn btn-ghost btn-sm" id="rel-pagina-proxima" type="button"'+(state.relatorioPagina>=totalPaginas-1?" disabled":"")+'>Próxima →</button>' +
+    '</div>';
   cont.innerHTML =
     '<div class="hint" style="margin-bottom:8px;">'+list.length+' pedido(s) encontrado(s) · Total: <b>'+fmtMoeda(total)+'</b></div>' +
-    '<table class="stock-table"><thead><tr><th>OP</th><th>Data</th><th>Cliente</th><th>Vendedor</th><th>Status</th><th style="text-align:right;">Valor</th></tr></thead><tbody>'+rows+'</tbody></table>';
+    '<table class="stock-table"><thead><tr><th>OP</th><th>Data</th><th>Cliente</th><th>Vendedor</th><th>Status</th><th style="text-align:right;">Valor</th></tr></thead><tbody>'+rows+'</tbody></table>' +
+    (totalPaginas>1 ? pagerHtml : "");
+  var btnAnt = $("#rel-pagina-anterior", cont);
+  if(btnAnt) btnAnt.addEventListener("click", function(){ state.relatorioPagina--; renderResultadoRelatorio(); });
+  var btnProx = $("#rel-pagina-proxima", cont);
+  if(btnProx) btnProx.addEventListener("click", function(){ state.relatorioPagina++; renderResultadoRelatorio(); });
 }
 function renderRelatorios(){
   var box = el("div", {class:"stack"});
@@ -775,6 +792,7 @@ function renderRelatorios(){
       state.filtroRelDataIni = $("#rel-data-ini").value;
       state.filtroRelDataFim = $("#rel-data-fim").value;
       state.filtroRelVendedor = $("#rel-vendedor").value;
+      state.relatorioPagina = 0;
       renderResultadoRelatorio();
     });
     renderResultadoRelatorio();
