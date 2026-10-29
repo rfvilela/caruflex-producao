@@ -225,6 +225,7 @@ var state = {
   authUser: null, user: null,
   view: "login",
   filtroPedidos: "todos",
+  filtroRelDataIni: "", filtroRelDataFim: "", filtroRelVendedor: "",
   bootstrapNecessario: null,
   cache: { estoque: [], pedidos: [], usuarios: [], clientes: [] },
   arteCache: {},
@@ -275,6 +276,12 @@ function fmtDate(iso){
   if(!iso) return "—";
   try{ var d = new Date(iso); return d.toLocaleDateString("pt-BR")+" "+d.toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"}); }
   catch(e){ return iso; }
+}
+function fmtDateOnly(s){
+  if(!s) return "—";
+  var partes = s.split("-");
+  if(partes.length!==3) return s;
+  return partes[2]+"/"+partes[1]+"/"+partes[0];
 }
 function todayInput(){ return new Date().toISOString().slice(0,10); }
 function orderNumero(){
@@ -460,6 +467,7 @@ function tabsFor(setor){
   if(setor==="comercial"||setor==="admin") tabs.push({id:"novoPedido", label:"Novo Pedido"});
   if(setor==="comercial"||setor==="admin") tabs.push({id:"clientes", label:"Clientes"});
   tabs.push({id:"pedidos", label:"Pedidos", count: (setor==="producao"||setor==="admin") ? (countByStatus("enviado")+countByStatus("recebido")) : 0});
+  if(setor==="comercial"||setor==="admin") tabs.push({id:"relatorios", label:"Relatórios"});
   tabs.push({id:"estoque", label:"Estoque"});
   if(setor==="admin") tabs.push({id:"admin", label:"Admin"});
   return tabs;
@@ -489,6 +497,7 @@ function renderShell(){
     case "clientes": content = renderClientes(); break;
     case "pedidos": content = renderPedidos(); break;
     case "estoque": content = renderEstoque(); break;
+    case "relatorios": content = renderRelatorios(); break;
     case "admin": content = renderAdmin(); break;
     default: content = renderPedidos();
   }
@@ -680,6 +689,124 @@ function exportarEstoquePdf(){
     '<div style="display:flex;align-items:center;gap:12px;margin-bottom:6px;">' +'<img src="'+LOGO_ESTOQUE_PDF+'" alt="CaruFlex" style="height:44px;width:auto;display:block;">' +'<h1 style="margin:0;">Relatório de Estoque — CaruFlex</h1></div>' +
     '<div class="sub">Gerado em '+agora.toLocaleDateString("pt-BR")+' às '+agora.toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"})+' · '+totalItens+' itens</div>' +
     '<table><thead><tr><th>Cor</th><th>Tamanho</th><th>Unidade</th><th style="text-align:right;">Quantidade</th><th>Situação</th></tr></thead><tbody>'+linhas+'</tbody></table>' +
+    '</body></html>';
+  var win = window.open("", "_blank");
+  if(!win){ toast("Permita pop-ups para gerar o relatório."); return; }
+  win.document.open(); win.document.write(html); win.document.close();
+  setTimeout(function(){ win.focus(); win.print(); }, 300);
+}
+
+// ---------- RELATÓRIOS ----------
+function vendedoresUnicos(){
+  var set = {};
+  state.cache.pedidos.forEach(function(p){ if(p.vendedor) set[p.vendedor] = true; });
+  return Object.keys(set).sort(function(a,b){ return a.localeCompare(b); });
+}
+function pedidosFiltradosRelatorio(){
+  var ini = state.filtroRelDataIni, fim = state.filtroRelDataFim, vendedor = state.filtroRelVendedor;
+  return state.cache.pedidos.filter(function(p){
+    var dataRef = p.dataPedido || (p.criadoEm||"").slice(0,10);
+    if(ini && dataRef < ini) return false;
+    if(fim && dataRef > fim) return false;
+    if(vendedor && p.vendedor !== vendedor) return false;
+    return true;
+  }).sort(function(a,b){ return (b.dataPedido||b.criadoEm||"").localeCompare(a.dataPedido||a.criadoEm||""); });
+}
+function renderResultadoRelatorio(){
+  var cont = $("#rel-resultado");
+  if(!cont) return;
+  var list = pedidosFiltradosRelatorio();
+  if(list.length===0){
+    cont.innerHTML = '<div class="hint">Nenhum pedido encontrado para os filtros selecionados.</div>';
+    return;
+  }
+  var total = list.reduce(function(s,p){ return s + (Number(p.valorPedido)||0); }, 0);
+  var rows = list.map(function(p){
+    return '<tr><td>'+esc(p.numero)+'</td><td>'+(p.dataPedido?fmtDateOnly(p.dataPedido):fmtDate(p.criadoEm))+'</td>' +
+      '<td>'+esc((p.cliente&&p.cliente.nome)||"—")+'</td><td>'+esc(p.vendedor||"—")+'</td>' +
+      '<td>'+esc(statusLabel(p.status))+'</td><td style="text-align:right;">'+(p.valorPedido?fmtMoeda(p.valorPedido):"—")+'</td></tr>';
+  }).join("");
+  cont.innerHTML =
+    '<div class="hint" style="margin-bottom:8px;">'+list.length+' pedido(s) encontrado(s) · Total: <b>'+fmtMoeda(total)+'</b></div>' +
+    '<table class="stock-table"><thead><tr><th>OP</th><th>Data</th><th>Cliente</th><th>Vendedor</th><th>Status</th><th style="text-align:right;">Valor</th></tr></thead><tbody>'+rows+'</tbody></table>';
+}
+function renderRelatorios(){
+  var box = el("div", {class:"stack"});
+  box.appendChild(el("div", {}, '<div class="section-title">Relatórios</div><div class="section-sub">Pedidos por período e vendedor, e itens com estoque negativo para o setor de compras.</div>'));
+
+  var card = el("div", {class:"card"});
+  card.innerHTML =
+    '<div class="section-title" style="font-size:15px;margin-bottom:10px;">Pedidos por período e vendedor</div>' +
+    '<div class="row">' +
+      '<div class="field"><label>Data inicial</label><input type="date" id="rel-data-ini" value="'+esc(state.filtroRelDataIni)+'"></div>' +
+      '<div class="field"><label>Data final</label><input type="date" id="rel-data-fim" value="'+esc(state.filtroRelDataFim)+'"></div>' +
+      '<div class="field"><label>Vendedor</label><select id="rel-vendedor"><option value="">Todos</option>' +
+        vendedoresUnicos().map(function(v){ return '<option value="'+esc(v)+'"'+(state.filtroRelVendedor===v?" selected":"")+'>'+esc(v)+'</option>'; }).join("") +
+      '</select></div>' +
+    '</div>' +
+    '<button class="btn btn-primary btn-sm" id="btn-filtrar-relatorio" type="button">Filtrar</button>' +
+    '<div id="rel-resultado" style="margin-top:14px;"></div>';
+  box.appendChild(card);
+
+  var itensNegativos = state.cache.estoque.filter(function(it){ return (Number(it.quantidade)||0) < 0; })
+    .sort(function(a,b){ return (Number(a.quantidade)||0) - (Number(b.quantidade)||0); });
+  var negCard = el("div", {class:"card"});
+  var negHtml =
+    '<div class="section-title" style="font-size:15px;margin-bottom:6px;">Itens com estoque negativo</div>' +
+    '<div class="section-sub" style="margin-bottom:10px;">Itens que precisam de reposição — envie esta lista para o setor de compras.</div>';
+  if(itensNegativos.length===0){
+    negHtml += '<div class="hint">Nenhum item com estoque negativo no momento.</div>';
+  } else {
+    negHtml +=
+      '<table class="stock-table"><thead><tr><th>Categoria</th><th>Cor</th><th>Tamanho</th><th>Unidade</th><th style="text-align:right;">Quantidade</th></tr></thead><tbody>' +
+        itensNegativos.map(function(it){
+          return '<tr><td>'+esc(it.categoria||"—")+'</td><td>'+esc(it.cor||"—")+'</td><td>'+esc(it.tamanho||"—")+'</td><td>'+esc(it.unidade||"un")+'</td>' +
+            '<td class="qty-cell"><span class="chip chip-baixo">'+fmtNum(it.quantidade)+'</span></td></tr>';
+        }).join("") +
+      '</tbody></table>' +
+      '<button class="btn btn-ghost btn-sm" id="btn-exportar-estoque-negativo" type="button" style="margin-top:10px;">Extrair Relatório (PDF)</button>';
+  }
+  negCard.innerHTML = negHtml;
+  box.appendChild(negCard);
+
+  setTimeout(function(){
+    var btnFiltrar = $("#btn-filtrar-relatorio");
+    if(btnFiltrar) btnFiltrar.addEventListener("click", function(){
+      state.filtroRelDataIni = $("#rel-data-ini").value;
+      state.filtroRelDataFim = $("#rel-data-fim").value;
+      state.filtroRelVendedor = $("#rel-vendedor").value;
+      renderResultadoRelatorio();
+    });
+    renderResultadoRelatorio();
+    var btnNeg = $("#btn-exportar-estoque-negativo");
+    if(btnNeg) btnNeg.addEventListener("click", exportarEstoqueNegativoPdf);
+  }, 0);
+
+  return box;
+}
+function exportarEstoqueNegativoPdf(){
+  var itensNegativos = state.cache.estoque.filter(function(it){ return (Number(it.quantidade)||0) < 0; })
+    .sort(function(a,b){ return (Number(a.quantidade)||0) - (Number(b.quantidade)||0); });
+  if(itensNegativos.length===0){ toast("Não há itens com estoque negativo para exportar."); return; }
+  var linhas = itensNegativos.map(function(it){
+    return '<tr><td>'+esc(it.categoria||"—")+'</td><td>'+esc(it.cor||"—")+'</td><td>'+esc(it.tamanho||"—")+'</td>' +
+      '<td>'+esc(it.unidade||"un")+'</td><td style="text-align:right;">'+fmtNum(it.quantidade)+'</td></tr>';
+  }).join("");
+  var agora = new Date();
+  var html =
+    '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><title>Itens para Compra - CaruFlex</title>' +
+    '<style>' +
+      'body{font-family:Arial,Helvetica,sans-serif;color:#161F27;padding:24px;}' +
+      'h1{font-size:18px;margin:0 0 2px;}' +
+      '.sub{color:#5B6873;font-size:12px;margin-bottom:18px;}' +
+      'table{width:100%;border-collapse:collapse;font-size:12px;}' +
+      'th,td{padding:6px 8px;border-bottom:1px solid #D9DFDA;text-align:left;}' +
+      'th{background:#EAEEEA;text-transform:uppercase;font-size:10px;letter-spacing:.04em;}' +
+      '@media print{ @page{ margin:16mm; } }' +
+    '</style></head><body>' +
+    '<div style="display:flex;align-items:center;gap:12px;margin-bottom:6px;">' +'<img src="'+LOGO_ESTOQUE_PDF+'" alt="CaruFlex" style="height:44px;width:auto;display:block;">' +'<h1 style="margin:0;">Itens para Compra — Estoque Negativo</h1></div>' +
+    '<div class="sub">Gerado em '+agora.toLocaleDateString("pt-BR")+' às '+agora.toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"})+' · '+itensNegativos.length+' item(ns)</div>' +
+    '<table><thead><tr><th>Categoria</th><th>Cor</th><th>Tamanho</th><th>Unidade</th><th style="text-align:right;">Quantidade</th></tr></thead><tbody>'+linhas+'</tbody></table>' +
     '</body></html>';
   var win = window.open("", "_blank");
   if(!win){ toast("Permita pop-ups para gerar o relatório."); return; }
