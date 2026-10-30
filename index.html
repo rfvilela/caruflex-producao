@@ -225,7 +225,7 @@ var state = {
   authUser: null, user: null,
   view: "login",
   filtroPedidos: "todos",
-  filtroRelDataIni: "", filtroRelDataFim: "", filtroRelVendedor: "", relatorioPagina: 0,
+  filtroRelDataIni: "", filtroRelDataFim: "", filtroRelVendedor: "", relatorioPagina: 0, relatorioSelecionado: "",
   bootstrapNecessario: null,
   cache: { estoque: [], pedidos: [], usuarios: [], clientes: [] },
   arteCache: {},
@@ -749,44 +749,63 @@ function renderResultadoRelatorio(){
 }
 function renderRelatorios(){
   var box = el("div", {class:"stack"});
-  box.appendChild(el("div", {}, '<div class="section-title">Relatórios</div><div class="section-sub">Pedidos por período e vendedor, e itens com estoque negativo para o setor de compras.</div>'));
+  box.appendChild(el("div", {}, '<div class="section-title">Relatórios</div><div class="section-sub">Escolha qual relatório deseja consultar.</div>'));
 
-  var card = el("div", {class:"card"});
-  card.innerHTML =
-    '<div class="section-title" style="font-size:15px;margin-bottom:10px;">Pedidos por período e vendedor</div>' +
-    '<div class="row">' +
-      '<div class="field"><label>Data inicial</label><input type="date" id="rel-data-ini" value="'+esc(state.filtroRelDataIni)+'"></div>' +
-      '<div class="field"><label>Data final</label><input type="date" id="rel-data-fim" value="'+esc(state.filtroRelDataFim)+'"></div>' +
-      '<div class="field"><label>Vendedor</label><select id="rel-vendedor"><option value="">Todos</option>' +
-        vendedoresUnicos().map(function(v){ return '<option value="'+esc(v)+'"'+(state.filtroRelVendedor===v?" selected":"")+'>'+esc(v)+'</option>'; }).join("") +
-      '</select></div>' +
-    '</div>' +
-    '<button class="btn btn-primary btn-sm" id="btn-filtrar-relatorio" type="button">Filtrar</button>' +
-    '<div id="rel-resultado" style="margin-top:14px;"></div>';
-  box.appendChild(card);
+  var selectorCard = el("div", {class:"card"});
+  selectorCard.innerHTML =
+    '<div style="display:flex;gap:10px;flex-wrap:wrap;">' +
+      '<button class="btn '+(state.relatorioSelecionado==="pedidos"?"btn-primary":"btn-ghost")+' btn-sm" type="button" data-relatorio-tipo="pedidos">Pedidos por período e vendedor</button>' +
+      '<button class="btn '+(state.relatorioSelecionado==="estoque_negativo"?"btn-primary":"btn-ghost")+' btn-sm" type="button" data-relatorio-tipo="estoque_negativo">Itens com estoque negativo</button>' +
+    '</div>';
+  box.appendChild(selectorCard);
 
-  var itensNegativos = state.cache.estoque.filter(function(it){ return (Number(it.quantidade)||0) < 0; })
-    .sort(function(a,b){ return (Number(a.quantidade)||0) - (Number(b.quantidade)||0); });
-  var negCard = el("div", {class:"card"});
-  var negHtml =
-    '<div class="section-title" style="font-size:15px;margin-bottom:6px;">Itens com estoque negativo</div>' +
-    '<div class="section-sub" style="margin-bottom:10px;">Itens que precisam de reposição — envie esta lista para o setor de compras.</div>';
-  if(itensNegativos.length===0){
-    negHtml += '<div class="hint">Nenhum item com estoque negativo no momento.</div>';
+  if(state.relatorioSelecionado === "pedidos"){
+    var card = el("div", {class:"card"});
+    card.innerHTML =
+      '<div class="section-title" style="font-size:15px;margin-bottom:10px;">Pedidos por período e vendedor</div>' +
+      '<div class="row">' +
+        '<div class="field"><label>Data inicial</label><input type="date" id="rel-data-ini" value="'+esc(state.filtroRelDataIni)+'"></div>' +
+        '<div class="field"><label>Data final</label><input type="date" id="rel-data-fim" value="'+esc(state.filtroRelDataFim)+'"></div>' +
+        '<div class="field"><label>Vendedor</label><select id="rel-vendedor"><option value="">Todos</option>' +
+          vendedoresUnicos().map(function(v){ return '<option value="'+esc(v)+'"'+(state.filtroRelVendedor===v?" selected":"")+'>'+esc(v)+'</option>'; }).join("") +
+        '</select></div>' +
+      '</div>' +
+      '<button class="btn btn-primary btn-sm" id="btn-filtrar-relatorio" type="button">Filtrar</button>' +
+      '<div id="rel-resultado" style="margin-top:14px;"></div>';
+    box.appendChild(card);
+  } else if(state.relatorioSelecionado === "estoque_negativo"){
+    var itensNegativos = state.cache.estoque.filter(function(it){ return (Number(it.quantidade)||0) < 0; })
+      .sort(function(a,b){ return (Number(a.quantidade)||0) - (Number(b.quantidade)||0); });
+    var negCard = el("div", {class:"card"});
+    var negHtml =
+      '<div class="section-title" style="font-size:15px;margin-bottom:6px;">Itens com estoque negativo</div>' +
+      '<div class="section-sub" style="margin-bottom:10px;">Itens que precisam de reposição — envie esta lista para o setor de compras.</div>';
+    if(itensNegativos.length===0){
+      negHtml += '<div class="hint">Nenhum item com estoque negativo no momento.</div>';
+    } else {
+      negHtml +=
+        '<table class="stock-table"><thead><tr><th>Categoria</th><th>Cor</th><th>Tamanho</th><th>Unidade</th><th style="text-align:right;">Quantidade</th></tr></thead><tbody>' +
+          itensNegativos.map(function(it){
+            return '<tr><td>'+esc(it.categoria||"—")+'</td><td>'+esc(it.cor||"—")+'</td><td>'+esc(it.tamanho||"—")+'</td><td>'+esc(it.unidade||"un")+'</td>' +
+              '<td class="qty-cell"><span class="chip chip-baixo">'+fmtNum(it.quantidade)+'</span></td></tr>';
+          }).join("") +
+        '</tbody></table>' +
+        '<button class="btn btn-ghost btn-sm" id="btn-exportar-estoque-negativo" type="button" style="margin-top:10px;">Extrair Relatório (PDF)</button>';
+    }
+    negCard.innerHTML = negHtml;
+    box.appendChild(negCard);
   } else {
-    negHtml +=
-      '<table class="stock-table"><thead><tr><th>Categoria</th><th>Cor</th><th>Tamanho</th><th>Unidade</th><th style="text-align:right;">Quantidade</th></tr></thead><tbody>' +
-        itensNegativos.map(function(it){
-          return '<tr><td>'+esc(it.categoria||"—")+'</td><td>'+esc(it.cor||"—")+'</td><td>'+esc(it.tamanho||"—")+'</td><td>'+esc(it.unidade||"un")+'</td>' +
-            '<td class="qty-cell"><span class="chip chip-baixo">'+fmtNum(it.quantidade)+'</span></td></tr>';
-        }).join("") +
-      '</tbody></table>' +
-      '<button class="btn btn-ghost btn-sm" id="btn-exportar-estoque-negativo" type="button" style="margin-top:10px;">Extrair Relatório (PDF)</button>';
+    box.appendChild(el("div", {class:"card empty-state"}, '<div class="glyph">📊</div>Escolha um relatório acima para carregar na página.'));
   }
-  negCard.innerHTML = negHtml;
-  box.appendChild(negCard);
 
   setTimeout(function(){
+    box.querySelectorAll("[data-relatorio-tipo]").forEach(function(b){
+      b.addEventListener("click", function(){
+        state.relatorioSelecionado = b.getAttribute("data-relatorio-tipo");
+        state.relatorioPagina = 0;
+        render();
+      });
+    });
     var btnFiltrar = $("#btn-filtrar-relatorio");
     if(btnFiltrar) btnFiltrar.addEventListener("click", function(){
       state.filtroRelDataIni = $("#rel-data-ini").value;
@@ -795,13 +814,14 @@ function renderRelatorios(){
       state.relatorioPagina = 0;
       renderResultadoRelatorio();
     });
-    renderResultadoRelatorio();
+    if(state.relatorioSelecionado === "pedidos") renderResultadoRelatorio();
     var btnNeg = $("#btn-exportar-estoque-negativo");
     if(btnNeg) btnNeg.addEventListener("click", exportarEstoqueNegativoPdf);
   }, 0);
 
   return box;
 }
+
 function exportarEstoqueNegativoPdf(){
   var itensNegativos = state.cache.estoque.filter(function(it){ return (Number(it.quantidade)||0) < 0; })
     .sort(function(a,b){ return (Number(a.quantidade)||0) - (Number(b.quantidade)||0); });
